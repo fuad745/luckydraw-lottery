@@ -14,12 +14,13 @@ final class PlayerService
      * referral code on first sight and recording who referred them.
      */
     public function resolve(
-        int $telegramId,
+        int|string $telegramId,
         string $name,
         ?string $username = null,
         ?string $phone = null,
         ?string $referredByCode = null,
     ): Player {
+        $telegramId = (string) $telegramId;
         $player = Player::find($telegramId);
 
         if ($player === null) {
@@ -54,7 +55,7 @@ final class PlayerService
         return $code;
     }
 
-    private function validReferrer(?string $code, int $telegramId): ?string
+    private function validReferrer(?string $code, int|string $telegramId): ?string
     {
         if ($code === null || $code === '') {
             return null;
@@ -62,7 +63,7 @@ final class PlayerService
 
         $referrer = Player::where('referral_code', $code)->first();
 
-        if ($referrer === null || $referrer->telegram_id === $telegramId) {
+        if ($referrer === null || (string) $referrer->telegram_id === (string) $telegramId) {
             return null;
         }
 

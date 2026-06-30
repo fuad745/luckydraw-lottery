@@ -22,9 +22,14 @@ final class NotificationLog extends Model
     ];
 
     protected $casts = [
-        'telegram_id' => 'integer',
+        'telegram_id' => 'string',
         'sent_at' => 'datetime',
     ];
+
+    public function setTelegramIdAttribute($value): void
+    {
+        $this->attributes['telegram_id'] = $value !== null ? (string) $value : null;
+    }
 
     public function round(): BelongsTo
     {

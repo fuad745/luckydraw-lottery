@@ -31,9 +31,9 @@ final class TelegramAuth
         return $this->user !== null && isset($this->user['id']);
     }
 
-    public function id(): ?int
+    public function id(): ?string
     {
-        return isset($this->user['id']) ? (int) $this->user['id'] : null;
+        return isset($this->user['id']) ? (string) $this->user['id'] : null;
     }
 
     public function name(): ?string

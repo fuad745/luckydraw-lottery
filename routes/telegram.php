@@ -54,8 +54,8 @@ $startHandler = static function (Nutgram $bot, ?string $payload = null) use ($pl
     );
 };
 
-$bot->onCommand('start {payload}', $startHandler)->description('Open the LuckyDraw Mini App');
-$bot->onCommand('start', $startHandler)->description('Open the LuckyDraw Mini App');
+$bot->onCommand('start {payload}', $startHandler);
+$bot->onCommand('start', $startHandler);
 
 /*
 | /help — how to play.
@@ -73,7 +73,7 @@ $bot->onCommand('help', function (Nutgram $bot): void {
             'Commands: /start /balance /mytickets /results /help',
         parse_mode: ParseMode::HTML,
     );
-})->description('How to play');
+});
 
 /*
 | /mytickets — the player's tickets in the latest round they joined.
@@ -109,7 +109,7 @@ $bot->onCommand('mytickets', function (Nutgram $bot) use ($player): void {
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('🎟 Open LuckyDraw', 'my-tickets'),
     );
-})->description('Show your tickets');
+});
 
 /*
 | /balance — wallet balance + open the wallet.
@@ -122,7 +122,7 @@ $bot->onCommand('balance', function (Nutgram $bot) use ($player): void {
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('👛 Open Wallet', 'wallet'),
     );
-})->description('Your wallet balance');
+});
 
 /*
 | /results — the latest finished round result.
@@ -152,7 +152,7 @@ $bot->onCommand('results', function (Nutgram $bot): void {
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('📜 View history', 'history'),
     );
-})->description('Latest draw result');
+});
 
 /*
 | /admin — restricted control panel (Mini App) + quick stats.
@@ -176,7 +176,7 @@ $bot->onCommand('admin', function (Nutgram $bot) use ($isAdmin): void {
         text: "🛠 <b>Admin</b>\n\n{$stats}\n\nManage everything in the browser panel:\n{$adminUrl}",
         parse_mode: ParseMode::HTML,
     );
-})->description('Admin control panel');
+});
 
 /*
 | Capture a shared phone number. The Mini App's "Share contact" prompt (and a
@@ -210,7 +210,7 @@ $bot->onContact(function (Nutgram $bot) use ($player): void {
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
     );
-})->description('Save a shared contact');
+});
 
 /*
 | Fallback for unknown messages.

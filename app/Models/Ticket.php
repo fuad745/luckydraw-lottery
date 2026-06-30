@@ -31,14 +31,24 @@ final class Ticket extends Model
 
     protected $casts = [
         'ticket_number' => 'integer',
-        'owner_telegram_id' => 'integer',
-        'co_owner_telegram_id' => 'integer',
+        'owner_telegram_id' => 'string',
+        'co_owner_telegram_id' => 'string',
         'is_split' => 'boolean',
         'is_winner' => 'boolean',
         'win_rank' => 'integer',
         'prize_amount' => 'decimal:2',
         'purchased_at' => 'datetime',
     ];
+
+    public function setOwnerTelegramIdAttribute($value): void
+    {
+        $this->attributes['owner_telegram_id'] = $value !== null ? (string) $value : null;
+    }
+
+    public function setCoOwnerTelegramIdAttribute($value): void
+    {
+        $this->attributes['co_owner_telegram_id'] = $value !== null ? (string) $value : null;
+    }
 
     public function round(): BelongsTo
     {

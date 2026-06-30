@@ -73,7 +73,7 @@ final class SendTelegramMessage implements ShouldQueue
     {
         NotificationLog::create([
             // Channel ids (@name or -100…) don't fit the numeric column — log as 0.
-            'telegram_id' => is_int($this->chatId) && $this->chatId > 0 ? $this->chatId : 0,
+            'telegram_id' => is_numeric($this->chatId) && $this->chatId > 0 ? (string) $this->chatId : 0,
             'type' => $this->type,
             'message' => $this->message,
             'round_id' => $this->roundId,

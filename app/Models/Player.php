@@ -17,7 +17,7 @@ final class Player extends Model
 
     public $incrementing = false;
 
-    protected $keyType = 'int';
+    protected $keyType = 'string';
 
     protected $fillable = [
         'telegram_id',
@@ -38,7 +38,7 @@ final class Player extends Model
     ];
 
     protected $casts = [
-        'telegram_id' => 'integer',
+        'telegram_id' => 'string',
         'referral_count' => 'integer',
         'free_tickets' => 'integer',
         'total_tickets_bought' => 'integer',
@@ -58,6 +58,11 @@ final class Player extends Model
         'total_winnings' => 0,
         'balance' => 0,
     ];
+
+    public function setTelegramIdAttribute($value): void
+    {
+        $this->attributes['telegram_id'] = $value !== null ? (string) $value : null;
+    }
 
     public function tickets(): HasMany
     {
