@@ -1,5 +1,10 @@
 <?php
 
+use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureRegistered;
+use App\Http\Middleware\EnsureTelegramAdmin;
+use App\Http\Middleware\ResolveTelegramUser;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,13 +19,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Resolve the Telegram Mini App user, then apply their language.
         $middleware->web(append: [
-            \App\Http\Middleware\ResolveTelegramUser::class,
-            \App\Http\Middleware\SetLocale::class,
+            ResolveTelegramUser::class,
+            SetLocale::class,
         ]);
 
         $middleware->alias([
-            'tg.admin' => \App\Http\Middleware\EnsureTelegramAdmin::class,
-            'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'tg.admin' => EnsureTelegramAdmin::class,
+            'admin' => EnsureAdmin::class,
+            'registered' => EnsureRegistered::class,
         ]);
 
         // The Telegram webhook is server-to-server; exclude it from CSRF.

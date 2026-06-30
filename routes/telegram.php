@@ -5,6 +5,7 @@
 use App\Enums\RoundStatus;
 use App\Models\Round;
 use App\Services\PlayerService;
+use App\Support\Phone;
 use App\Telegram\MiniApp;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
@@ -176,6 +177,40 @@ $bot->onCommand('admin', function (Nutgram $bot) use ($isAdmin): void {
         parse_mode: ParseMode::HTML,
     );
 })->description('Admin control panel');
+
+/*
+| Capture a shared phone number. The Mini App's "Share contact" prompt (and a
+| reply-keyboard contact button) deliver the contact here — we save it to the
+| player so they're "registered" and can be paid out. This is the reliable,
+| server-side half of the registration flow.
+*/
+$bot->onContact(function (Nutgram $bot) use ($player): void {
+    $contact = $bot->message()?->contact;
+    if ($contact === null) {
+        return;
+    }
+
+    // Only accept the user's OWN contact (Telegram sets user_id to the sharer).
+    if ($contact->user_id !== null && (int) $contact->user_id !== (int) $bot->userId()) {
+        $bot->sendMessage(text: '⚠️ Please share *your own* contact to register.', parse_mode: ParseMode::MARKDOWN);
+
+        return;
+    }
+
+    $phone = Phone::normalize($contact->phone_number);
+    if ($phone === null) {
+        return;
+    }
+
+    $me = $player($bot);
+    $me->update(['phone' => $phone]);
+
+    $bot->sendMessage(
+        text: "✅ <b>Thanks, {$me->name}!</b>\nYour contact is saved — you're all set. Tap below to play 👇",
+        parse_mode: ParseMode::HTML,
+        reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
+    );
+})->description('Save a shared contact');
 
 /*
 | Fallback for unknown messages.

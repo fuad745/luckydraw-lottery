@@ -29,6 +29,15 @@
 
     [x-cloak] { display: none !important; }
 
+    /* Telegram-only gate: hide the game outside Telegram, show the gate. The
+       <html> class is set before first paint so the game never flashes. */
+    .tg-gate { display: none; }
+    html.tg-blocked .tg-gate {
+        @apply flex min-h-screen flex-col items-center justify-center;
+    }
+    html.tg-blocked .app-shell,
+    html.tg-blocked .app-nav { display: none !important; }
+
     /* Visible keyboard focus across the dark theme (a11y) — pointer clicks stay clean. */
     a:focus-visible, button:focus-visible, [role="button"]:focus-visible, select:focus-visible, input:focus-visible {
         @apply outline-none ring-2 ring-gold-400/60 ring-offset-2 ring-offset-ink-900;

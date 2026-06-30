@@ -13,6 +13,7 @@ use App\Livewire\History;
 use App\Livewire\Leaderboard;
 use App\Livewire\LotteryHome;
 use App\Livewire\MyTickets;
+use App\Livewire\Register;
 use App\Livewire\Settings;
 use App\Livewire\Wallet;
 use Illuminate\Support\Facades\Route;
@@ -22,12 +23,18 @@ use Illuminate\Support\Facades\Route;
 | Telegram Mini App (Livewire)
 |--------------------------------------------------------------------------
 */
-Route::get('/', LotteryHome::class)->name('home');
-Route::get('/wallet', Wallet::class)->name('wallet');
-Route::get('/my-tickets', MyTickets::class)->name('my-tickets');
-Route::get('/history', History::class)->name('history');
-Route::get('/leaderboard', Leaderboard::class)->name('leaderboard');
-Route::get('/settings', Settings::class)->name('settings');
+// Registration (share contact) — must NOT carry the `registered` gate itself.
+Route::get('/register', Register::class)->name('register');
+
+// The game — only reachable once the player has shared their contact.
+Route::middleware('registered')->group(function (): void {
+    Route::get('/', LotteryHome::class)->name('home');
+    Route::get('/wallet', Wallet::class)->name('wallet');
+    Route::get('/my-tickets', MyTickets::class)->name('my-tickets');
+    Route::get('/history', History::class)->name('history');
+    Route::get('/leaderboard', Leaderboard::class)->name('leaderboard');
+    Route::get('/settings', Settings::class)->name('settings');
+});
 
 /*
 |--------------------------------------------------------------------------

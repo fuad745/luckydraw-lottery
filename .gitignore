@@ -3,6 +3,10 @@
 .env
 .env.backup
 .env.production
+
+# Local secret/reference files — never commit these
+/env from server
+*.txt
 .phpactor.json
 .phpunit.result.cache
 /.codex

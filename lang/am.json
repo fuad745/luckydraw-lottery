@@ -130,5 +130,28 @@
     "Open from Telegram to deposit.": "ለማስገባት ከቴሌግራም ይክፈቱ።",
     "Deposit confirmed: +:amount :currency": "ተቀማጭ ተረጋግጧል፦ +:amount :currency",
     "Open from Telegram to withdraw.": "ለማውጣት ከቴሌግራም ይክፈቱ።",
-    "Withdrawal requested — pending payout.": "ማውጣት ተጠይቋል — ክፍያ በመጠባበቅ ላይ።"
+    "Withdrawal requested — pending payout.": "ማውጣት ተጠይቋል — ክፍያ በመጠባበቅ ላይ።",
+
+    "This game runs inside Telegram. Open it from the bot to play.": "ይህ ጨዋታ በቴሌግራም ውስጥ ይሰራል። ለመጫወት ከቦቱ ይክፈቱት።",
+    "Open in Telegram": "በቴሌግራም ክፈት",
+
+    "Welcome, :name!": "እንኳን ደህና መጡ፣ :name!",
+    "Welcome to LuckyDraw!": "ወደ ላኪድሮው እንኳን በደህና መጡ!",
+    "Share your phone number once to create your account. We use it to pay out your winnings and withdrawals.": "መለያዎን ለመፍጠር ስልክ ቁጥርዎን አንድ ጊዜ ያጋሩ። ሽልማቶችዎንና ወጪዎችዎን ለመክፈል እንጠቀምበታለን።",
+    "Share my contact to start": "ለመጀመር እውቂያዬን አጋራ",
+    "Waiting for Telegram…": "ቴሌግራምን በመጠበቅ ላይ…",
+    "Your number is private — only the organiser can see it, never other players.": "ቁጥርዎ የግል ነው — አዘጋጁ ብቻ ነው የሚያየው፣ ሌሎች ተጫዋቾች በፍጹም አያዩትም።",
+    "That number didn't look right — please try sharing your contact again.": "ቁጥሩ ትክክል አይመስልም — እባክዎ እውቂያዎን እንደገና ያጋሩ።",
+
+    "No username": "የተጠቃሚ ስም የለም",
+    "Phone": "ስልክ",
+    "Change": "ቀይር",
+    "Add": "አክል",
+    "Referral code": "የግብዣ ኮድ",
+    "Invited": "የተጋበዙ",
+    ":count friends": ":count ጓደኞች",
+    ":count free": ":count ነጻ",
+    "Joined": "የተቀላቀለበት",
+    "That number didn't look right — please try again.": "ቁጥሩ ትክክል አይመስልም — እባክዎ እንደገና ይሞክሩ።",
+    "Contact updated.": "እውቂያ ተዘምኗል።"
 }
