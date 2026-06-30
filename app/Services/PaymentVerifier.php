@@ -50,9 +50,21 @@ final class PaymentVerifier
         }
 
         $data = is_array($res->json()) ? $res->json() : [];
-        $success = $res->successful()
-            && (($data['success'] ?? null) !== false)
-            && $this->extractAmount($data) > 0;
+
+        // Treat as verified only when the HTTP call succeeded, the provider did
+        // not report an explicit failure/pending state, and a real amount landed.
+        // (The previous `!== false` check failed open on null/absent flags.)
+        $flag = $data['success'] ?? $data['ok'] ?? null;
+        $flagOk = $flag === null ? true : filter_var($flag, FILTER_VALIDATE_BOOLEAN);
+
+        $state = strtolower((string) ($this->dig($data, ['status', 'transactionStatus', 'state', 'result']) ?? ''));
+        $stateOk = $state === '' || in_array(
+            $state,
+            ['success', 'successful', 'completed', 'complete', 'paid', 'settled', 'confirmed', 'done', 'ok'],
+            true,
+        );
+
+        $success = $res->successful() && $flagOk && $stateOk && $this->extractAmount($data) > 0;
 
         if (! $success) {
             return $fail($data['message'] ?? $data['error'] ?? 'We could not verify that reference. Double-check it.');

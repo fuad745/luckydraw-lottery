@@ -85,6 +85,34 @@ final class DrawTest extends TestCase
         Queue::assertPushed(StartNextRound::class);
     }
 
+    public function test_odd_pot_splits_to_the_exact_cent_with_no_leak(): void
+    {
+        Queue::fake();
+        // Pot 75 (3 tickets @ 25) split 70/15/ticket_price across 3 winners is the
+        // kind of structure where naive float rounding drops/adds a cent.
+        $round = Round::factory()->create([
+            'total_tickets' => 3,
+            'ticket_price' => 25,
+            'status' => RoundStatus::Open,
+            'auto_draw' => true,
+            'winners_count' => 3,
+            'prize_structure' => [
+                ['type' => 'percent', 'value' => 70],
+                ['type' => 'percent', 'value' => 15],
+                ['type' => 'ticket_price'],
+            ],
+        ]);
+
+        $lottery = app(LotteryService::class);
+        $this->fillRound($lottery, $round); // pot = 75
+        $winners = $lottery->performDraw($round->fresh());
+        $round->refresh();
+
+        // Every cent is accounted for: prizes paid + house cut == pot.
+        $prizesPaid = (float) Player::sum('total_winnings');
+        $this->assertSame(75.0, round($prizesPaid + (float) $round->admin_cut, 2));
+    }
+
     public function test_split_winner_shares_the_tier_and_house_keeps_the_open_half(): void
     {
         Queue::fake();

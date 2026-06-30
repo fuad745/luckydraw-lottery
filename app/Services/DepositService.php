@@ -8,6 +8,7 @@ use App\Enums\TransactionType;
 use App\Models\Player;
 use App\Models\Transaction;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -85,14 +86,37 @@ final class DepositService
     /** Ensure the verified payment actually landed in one of our accounts. */
     private function assertPaidToUs(array $result): void
     {
-        $accounts = (array) config('lottery.payments.deposit_accounts', []);
+        $accounts = array_filter((array) config('lottery.payments.deposit_accounts', []));
         if ($accounts === []) {
-            return; // not configured — skip the check (dev / trusting mode)
+            // Not configured — any verified payment is credited regardless of payee.
+            // Acceptable in dev, but a real fail-open risk in production: surface it.
+            if (app()->environment('production')) {
+                Log::warning('Deposit credited without a receiver check — set DEPOSIT_ACCOUNTS to enforce "paid to us".', [
+                    'receiver' => $result['receiver'] ?? null,
+                    'receiverAccount' => $result['receiverAccount'] ?? null,
+                ]);
+            }
+
+            return;
         }
 
-        $haystack = Str::lower(($result['receiver'] ?? '').' '.($result['receiverAccount'] ?? ''));
+        $receiver = Str::lower(($result['receiver'] ?? '').' '.($result['receiverAccount'] ?? ''));
+        $receiverDigits = preg_replace('/\D+/', '', (string) ($result['receiverAccount'] ?? ''));
+
+        // Compare the trailing subscriber digits so a local phone (0912…) still
+        // matches its international form (251912…) despite the differing prefix.
+        $tail = static fn (string $d): string => strlen($d) >= 9 ? substr($d, -9) : $d;
+
         foreach ($accounts as $account) {
-            if ($account !== '' && str_contains($haystack, Str::lower($account))) {
+            $account = (string) $account;
+            if ($account === '') {
+                continue;
+            }
+
+            $accountDigits = preg_replace('/\D+/', '', $account);
+            $digitMatch = $accountDigits !== '' && $receiverDigits !== '' && $tail($accountDigits) === $tail($receiverDigits);
+
+            if (str_contains($receiver, Str::lower($account)) || $digitMatch) {
                 return;
             }
         }

@@ -27,6 +27,7 @@ final class Player extends Model
         'phone',
         'referral_code',
         'referred_by',
+        'referral_rewarded_at',
         'referral_count',
         'free_tickets',
         'total_tickets_bought',
@@ -44,6 +45,7 @@ final class Player extends Model
         'total_wins' => 'integer',
         'total_winnings' => 'decimal:2',
         'balance' => 'decimal:2',
+        'referral_rewarded_at' => 'datetime',
         'banned_at' => 'datetime',
     ];
 

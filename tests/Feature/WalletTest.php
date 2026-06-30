@@ -74,6 +74,28 @@ final class WalletTest extends TestCase
         app(DepositService::class)->deposit($player, 'telebirr', 'WRONG');
     }
 
+    public function test_a_pending_or_failed_transaction_status_is_rejected(): void
+    {
+        $player = Player::factory()->create(['balance' => 0]);
+        // Has an amount, but the provider reports it is not settled yet.
+        $this->fakeVerify(['amount' => 500, 'status' => 'pending']);
+
+        $this->expectException(ValidationException::class);
+        app(DepositService::class)->deposit($player, 'telebirr', 'PENDING1');
+    }
+
+    public function test_account_match_normalises_phone_digits(): void
+    {
+        // Configured local form vs verified international form must still match.
+        config(['lottery.payments.deposit_accounts' => ['0912345678']]);
+        $player = Player::factory()->create(['balance' => 0]);
+        $this->fakeVerify(['success' => true, 'amount' => 250, 'receiverAccountNumber' => '251912345678']);
+
+        $tx = app(DepositService::class)->deposit($player, 'telebirr', 'PHONE1');
+
+        $this->assertSame(250.0, (float) $tx->amount);
+    }
+
     public function test_withdrawal_reserves_funds_and_admin_approves(): void
     {
         $player = Player::factory()->create(['balance' => 100]);

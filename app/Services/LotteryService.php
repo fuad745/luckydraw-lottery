@@ -13,6 +13,7 @@ use App\Models\Player;
 use App\Models\Round;
 use App\Models\Ticket;
 use App\Models\Transaction;
+use App\Support\Money;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -267,7 +268,18 @@ final class LotteryService
             return;
         }
 
-        $round->update(['status' => RoundStatus::Drawing]);
+        // Atomic compare-and-set on the Open→Drawing transition. Only one of any
+        // concurrent triggers (a board-filling purchase racing the deadline cron)
+        // wins this update, so exactly one ProcessDraw is ever dispatched.
+        $claimed = Round::whereKey($round->getKey())
+            ->where('status', RoundStatus::Open->value)
+            ->update(['status' => RoundStatus::Drawing->value]);
+
+        if ($claimed === 0) {
+            return; // another trigger already started this draw
+        }
+
+        $round->setAttribute('status', RoundStatus::Drawing);
 
         $this->notifier->broadcast(
             $this->roundHolderIds($round),
@@ -297,8 +309,15 @@ final class LotteryService
         $pot = $round->prizePool();
         $split = $this->prizes->distribute($pot, (float) $round->ticket_price, $structure);
 
-        $outcome = DB::transaction(function () use ($round, $structure, $split): array {
+        $outcome = DB::transaction(function () use ($round, $structure, $split, $pot): array {
             $round = Round::whereKey($round->getKey())->lockForUpdate()->first();
+
+            // Re-assert the state under the row lock. If a concurrent ProcessDraw
+            // already drew this round (or it was cancelled), bail without paying
+            // out a second time — this is what prevents double-credited winnings.
+            if (! $round || $round->status !== RoundStatus::Drawing) {
+                return ['noop' => true];
+            }
 
             $winners = $this->draws->pickWinners($round, count($structure));
             if ($winners->isEmpty()) {
@@ -307,31 +326,42 @@ final class LotteryService
                 return ['winners' => collect(), 'admin' => $pot, 'perHolder' => []];
             }
 
-            $adminExtra = 0.0;
-            $perHolder = []; // telegram_id => total amount, for DMs
+            $adminExtraCents = 0;
+            $perHolderCents = []; // telegram_id => total cents, for DMs
 
             foreach ($structure as $i => $_tier) {
-                $tierAmount = $split['tiers'][$i] ?? 0.0;
+                $tierCents = Money::toCents($split['tiers'][$i] ?? 0.0);
                 $ticket = $winners->get($i);
 
                 if ($ticket === null) {
                     // Fewer winning tickets than tiers — unused prize goes to the house.
-                    $adminExtra += $tierAmount;
+                    $adminExtraCents += $tierCents;
 
                     continue;
                 }
 
-                $ticket->update(['is_winner' => true, 'win_rank' => $i + 1, 'prize_amount' => round($tierAmount, 2)]);
+                $ticket->update(['is_winner' => true, 'win_rank' => $i + 1, 'prize_amount' => Money::toAmount($tierCents)]);
 
-                // Split the tier across the holders of this number; unsold halves → house.
-                foreach ($ticket->holderShares() as $tid => $fraction) {
-                    $perHolder[$tid] = ($perHolder[$tid] ?? 0) + $tierAmount * $fraction;
+                // Split the tier exactly across holders + an "unsold" house share, so
+                // half-tickets never lose or leak a cent to rounding.
+                $shares = $ticket->holderShares();        // tid => 0.5 | 1.0
+                $tids = array_keys($shares);
+                $weights = array_values($shares);
+                $houseFraction = max(0.0, 1.0 - array_sum($shares));
+                if ($houseFraction > 0) {
+                    $weights[] = $houseFraction;          // last slot = house
                 }
-                $soldFraction = array_sum($ticket->holderShares());
-                $adminExtra += $tierAmount * (1 - $soldFraction);
+
+                $alloc = Money::allocate($tierCents, $weights);
+                foreach ($tids as $j => $tid) {
+                    $perHolderCents[$tid] = ($perHolderCents[$tid] ?? 0) + $alloc[$j];
+                }
+                if ($houseFraction > 0) {
+                    $adminExtraCents += $alloc[count($tids)];
+                }
             }
 
-            $adminCut = round($split['admin'] + $adminExtra, 2);
+            $adminCut = Money::toAmount(Money::toCents($split['admin']) + $adminExtraCents);
 
             $round->update([
                 'status' => RoundStatus::Closed,
@@ -345,9 +375,11 @@ final class LotteryService
             Player::whereIn('telegram_id', $holderIds)->increment('total_wins');
 
             // Credit each holder's actual payout to their lifetime stat AND wallet.
-            foreach ($perHolder as $tid => $amount) {
-                $amount = round($amount, 2);
-                if ($amount > 0) {
+            $perHolder = [];
+            foreach ($perHolderCents as $tid => $cents) {
+                $amount = Money::toAmount($cents);
+                $perHolder[$tid] = $amount;
+                if ($cents > 0) {
                     Player::where('telegram_id', $tid)->increment('total_winnings', $amount);
                     $this->wallet->credit((int) $tid, $amount, TransactionType::Winning, [
                         'round_id' => $round->id,
@@ -358,6 +390,13 @@ final class LotteryService
 
             return ['winners' => $winners, 'admin' => $adminCut, 'perHolder' => $perHolder];
         });
+
+        // A concurrent worker already finished this draw — return its result and
+        // do nothing else (no second announcement, no duplicate restart).
+        if ($outcome['noop'] ?? false) {
+            return $round->fresh()?->tickets()->where('is_winner', true)->orderBy('win_rank')->get()
+                ?? collect();
+        }
 
         $this->announceResult($round->refresh(), $outcome['winners'], $outcome['perHolder']);
         $this->scheduleRestart($round);
@@ -371,7 +410,18 @@ final class LotteryService
             return;
         }
 
-        $round->update(['status' => RoundStatus::Cancelled]);
+        // Atomically claim the cancellation. If a draw is mid-payout it holds the
+        // row lock, so this UPDATE blocks until it commits and then matches 0 rows
+        // (status is Closed) — the round can never be both refunded AND paid out.
+        $claimed = Round::whereKey($round->getKey())
+            ->whereIn('status', [RoundStatus::Open->value, RoundStatus::Drawing->value])
+            ->update(['status' => RoundStatus::Cancelled->value]);
+
+        if ($claimed === 0) {
+            return;
+        }
+
+        $round->setAttribute('status', RoundStatus::Cancelled);
 
         // Refund every wallet that paid into this round.
         $this->refundRound($round);

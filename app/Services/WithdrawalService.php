@@ -9,6 +9,7 @@ use App\Enums\TransactionType;
 use App\Exceptions\InsufficientBalanceException;
 use App\Models\Player;
 use App\Models\Transaction;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class WithdrawalService
@@ -68,11 +69,22 @@ final class WithdrawalService
     /** Admin marks the payout as sent. */
     public function approve(Transaction $tx): void
     {
-        if ($tx->type !== TransactionType::Withdrawal || $tx->status !== TransactionStatus::Pending) {
+        // Lock + re-check so two admins clicking at once can't both act on it.
+        $claimed = DB::transaction(function () use ($tx): bool {
+            $locked = Transaction::whereKey($tx->getKey())->lockForUpdate()->first();
+
+            if (! $locked || $locked->type !== TransactionType::Withdrawal || $locked->status !== TransactionStatus::Pending) {
+                return false;
+            }
+
+            $locked->update(['status' => TransactionStatus::Completed, 'processed_at' => now()]);
+
+            return true;
+        });
+
+        if (! $claimed) {
             return;
         }
-
-        $tx->update(['status' => TransactionStatus::Completed, 'processed_at' => now()]);
 
         $this->notifier->send(
             (int) $tx->telegram_id,
@@ -84,15 +96,27 @@ final class WithdrawalService
     /** Admin rejects: refund the reserved amount back to the wallet. */
     public function reject(Transaction $tx, ?string $reason = null): void
     {
-        if ($tx->type !== TransactionType::Withdrawal || $tx->status !== TransactionStatus::Pending) {
+        // Lock + re-check so the refund credit can only ever happen once, even if
+        // two admins reject simultaneously.
+        $claimed = DB::transaction(function () use ($tx, $reason): bool {
+            $locked = Transaction::whereKey($tx->getKey())->lockForUpdate()->first();
+
+            if (! $locked || $locked->type !== TransactionType::Withdrawal || $locked->status !== TransactionStatus::Pending) {
+                return false;
+            }
+
+            $this->wallet->credit((int) $locked->telegram_id, (float) $locked->amount, TransactionType::Refund, [
+                'note' => 'Refund for rejected withdrawal #'.$locked->id.($reason ? ': '.$reason : ''),
+            ]);
+
+            $locked->update(['status' => TransactionStatus::Rejected, 'processed_at' => now(), 'note' => $reason]);
+
+            return true;
+        });
+
+        if (! $claimed) {
             return;
         }
-
-        $this->wallet->credit((int) $tx->telegram_id, (float) $tx->amount, TransactionType::Refund, [
-            'note' => 'Refund for rejected withdrawal #'.$tx->id.($reason ? ': '.$reason : ''),
-        ]);
-
-        $tx->update(['status' => TransactionStatus::Rejected, 'processed_at' => now(), 'note' => $reason]);
 
         $this->notifier->send(
             (int) $tx->telegram_id,

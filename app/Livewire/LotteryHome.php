@@ -47,7 +47,7 @@ final class LotteryHome extends Component
     {
         $auth = $this->auth();
         if (! $auth->check()) {
-            $this->dispatch('toast', message: 'Open this app from Telegram to buy.');
+            $this->dispatch('toast', message: __('Open this app from Telegram to buy.'), type: 'error');
 
             return;
         }
@@ -56,7 +56,7 @@ final class LotteryHome extends Component
 
         $round = Round::current();
         if ($round === null || ! $round->isOpen()) {
-            $this->dispatch('toast', message: 'There is no open round right now.');
+            $this->dispatch('toast', message: __('There is no open round right now.'), type: 'error');
 
             return;
         }
@@ -73,7 +73,7 @@ final class LotteryHome extends Component
                 referredByCode: $this->ref ?: null,
             ));
         } catch (ValidationException $e) {
-            $this->dispatch('toast', message: collect($e->errors())->flatten()->first());
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
 
             return;
         }
@@ -83,7 +83,7 @@ final class LotteryHome extends Component
 
         $this->dispatch('haptic', type: 'notification', style: 'success');
         $this->dispatch('cleared'); // tell Alpine to reset the selection
-        $this->dispatch('toast', message: "You got {$list}! 🎟");
+        $this->dispatch('toast', message: __('You got :list! 🎟', ['list' => $list]), type: 'success');
         $this->dispatch('purchased',
             numbers: $list,
             shareUrl: $player->referralLink((string) config('lottery.bot_username')) ?: (string) config('lottery.mini_app_url'),

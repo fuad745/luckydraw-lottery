@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\TransactionType;
 use App\Models\Transaction;
 use App\Services\DepositService;
 use App\Services\PaymentVerifier;
@@ -41,7 +42,7 @@ final class Wallet extends Component
     {
         $player = $this->auth()->player();
         if ($player === null) {
-            $this->dispatch('toast', message: 'Open from Telegram to deposit.');
+            $this->dispatch('toast', message: __('Open from Telegram to deposit.'), type: 'error');
 
             return;
         }
@@ -52,21 +53,21 @@ final class Wallet extends Component
                 'phone' => $this->payerPhone ?: null,
             ]);
         } catch (ValidationException $e) {
-            $this->dispatch('toast', message: collect($e->errors())->flatten()->first());
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
 
             return;
         }
 
         $this->reset('reference', 'suffix', 'payerPhone');
         $this->dispatch('haptic', type: 'notification', style: 'success');
-        $this->dispatch('toast', message: "Deposit confirmed: +{$tx->amount} ".config('lottery.currency'));
+        $this->dispatch('toast', message: __('Deposit confirmed: +:amount :currency', ['amount' => $tx->amount, 'currency' => config('lottery.currency')]), type: 'success');
     }
 
     public function withdraw(WithdrawalService $withdrawals): void
     {
         $player = $this->auth()->player();
         if ($player === null) {
-            $this->dispatch('toast', message: 'Open from Telegram to withdraw.');
+            $this->dispatch('toast', message: __('Open from Telegram to withdraw.'), type: 'error');
 
             return;
         }
@@ -74,14 +75,14 @@ final class Wallet extends Component
         try {
             $withdrawals->request($player, (float) $this->amount, $this->payoutProvider, $this->payoutAccount);
         } catch (ValidationException $e) {
-            $this->dispatch('toast', message: collect($e->errors())->flatten()->first());
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
 
             return;
         }
 
         $this->reset('amount', 'payoutAccount');
         $this->dispatch('haptic', type: 'notification', style: 'warning');
-        $this->dispatch('toast', message: 'Withdrawal requested — pending payout.');
+        $this->dispatch('toast', message: __('Withdrawal requested — pending payout.'), type: 'success');
     }
 
     public function render()
@@ -93,10 +94,17 @@ final class Wallet extends Component
             ? Transaction::where('telegram_id', $auth->id())->latest('id')->limit(30)->get()
             : collect();
 
+        $withdrawals = $player
+            ? Transaction::where('telegram_id', $auth->id())
+                ->where('type', TransactionType::Withdrawal->value)
+                ->latest('id')->limit(5)->get()
+            : collect();
+
         return view('livewire.wallet', [
             'player' => $player,
             'balance' => (float) ($player->balance ?? 0),
             'transactions' => $transactions,
+            'withdrawals' => $withdrawals,
             'providers' => (array) config('lottery.payments.providers', []),
             'currency' => config('lottery.currency', 'ETB'),
             'minDeposit' => (float) config('lottery.payments.min_deposit', 10),

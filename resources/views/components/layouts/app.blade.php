@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="{{ app()->getLocale() }}" class="dark">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    {{-- Allow pinch-zoom (a11y) — Mini Apps don't need to lock scale. --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0b0e14">
     <title>{{ $title ?? 'LuckyDraw 🎰' }}</title>
 
@@ -11,7 +12,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen" @if (app()->getLocale() === 'am') dir="ltr" @endif>
+<body class="min-h-screen">
     <div class="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-24 pt-4">
         {{ $slot }}
     </div>
@@ -34,7 +35,7 @@
             @foreach ($nav as [$route, $icon, $label])
                 <a href="{{ route($route) }}" wire:navigate
                    class="flex flex-col items-center gap-0.5 py-2.5 {{ request()->routeIs($route) ? 'text-gold-400' : 'text-slate-400' }}">
-                    <span class="text-lg">{{ $icon }}</span>
+                    <span class="text-lg" aria-hidden="true">{{ $icon }}</span>
                     <span>{{ $label }}</span>
                 </a>
             @endforeach

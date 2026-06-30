@@ -2,9 +2,16 @@
 <div wire:poll.3s.visible
      x-data="{
         toast: null,
+        toastType: 'info',
         share: null,
         init() {
-            Livewire.on('toast', (e) => { this.toast = (Array.isArray(e)?e[0]:e).message; clearTimeout(this._t); this._t = setTimeout(() => this.toast = null, 3500); });
+            Livewire.on('toast', (e) => {
+                const d = Array.isArray(e) ? e[0] : e;
+                this.toast = d.message;
+                this.toastType = d.type || 'info';
+                clearTimeout(this._t);
+                this._t = setTimeout(() => this.toast = null, this.toastType === 'error' ? 6000 : 3500);
+            });
             Livewire.on('purchased', (e) => { this.share = Array.isArray(e)?e[0]:e; });
         }
      }">
@@ -24,10 +31,14 @@
         </a>
     </header>
 
-    {{-- Toast --}}
-    <div x-show="toast" x-transition x-cloak
-         class="card mb-3 border-gold-500/40 p-3 text-center text-sm font-semibold text-gold-300"
-         x-text="toast"></div>
+    {{-- Toast (tap to dismiss; colour + icon distinguish success / error) --}}
+    <div x-show="toast" x-transition x-cloak role="status" aria-live="polite"
+         @click="toast = null"
+         class="card mb-3 flex cursor-pointer items-start gap-2 p-3 text-sm font-semibold"
+         :class="toastType === 'error' ? 'border-rose-500/50 text-rose-200' : (toastType === 'success' ? 'border-emerald-500/50 text-emerald-200' : 'border-gold-500/40 text-gold-300')">
+        <span aria-hidden="true" x-text="toastType === 'error' ? '⚠️' : (toastType === 'success' ? '✅' : 'ℹ️')"></span>
+        <span class="flex-1 text-left" x-text="toast"></span>
+    </div>
 
     @if ($round === null)
         <div class="card mt-10 p-8 text-center">
@@ -40,21 +51,22 @@
         {{-- ===== 3D draw machine ===== --}}
         <div class="card mt-6 p-6 text-center">
             <p class="text-xs uppercase tracking-widest text-slate-400">{{ $round->title }}</p>
-            <h2 class="mt-1 text-xl font-black gold-text">Drawing the winners…</h2>
+            <h2 class="mt-1 text-xl font-black gold-text">{{ __('Drawing the winners…') }}</h2>
 
             <div class="lotto-stage my-6">
                 <div class="lotto-drum">
                     @php $ballCount = min(16, max(8, (int) $round->total_tickets)); @endphp
                     @for ($i = 0; $i < $ballCount; $i++)
-                        <span class="lotto-ball {{ $i % 2 ? 'alt' : '' }}">{{ random_int(1, $round->total_tickets) }}</span>
+                        {{-- Stable pseudo-number per ball so the poll re-render doesn't make them jump. --}}
+                        <span class="lotto-ball {{ $i % 2 ? 'alt' : '' }}">{{ ($i * 7 + $round->id) % $round->total_tickets + 1 }}</span>
                     @endfor
                 </div>
                 {{-- chute --}}
                 <div class="mx-auto mt-2 h-6 w-10 rounded-b-xl border border-t-0 border-gold-500/40 bg-ink-900"></div>
             </div>
 
-            <p class="text-sm text-slate-300">Selecting <b class="text-gold-400">{{ $round->winners_count }}</b> winning ball(s) from a pool of
-                <b class="text-gold-400">{{ $round->prizePool() }} {{ $round->currency }}</b></p>
+            <p class="text-sm text-slate-300">{{ __('Selecting') }} <b class="text-gold-400">{{ $round->winners_count }}</b> {{ __('winning ball(s) from a pool of') }}
+                <b class="text-gold-400">{{ number_format($round->prizePool(), 2) }} {{ $round->currency }}</b></p>
             <div class="mt-4 flex justify-center gap-1.5">
                 <span class="h-2 w-2 animate-ping rounded-full bg-gold-500"></span>
                 <span class="h-2 w-2 animate-ping rounded-full bg-gold-500 [animation-delay:150ms]"></span>
@@ -81,9 +93,9 @@
         @endphp
         <div wire:key="reveal-{{ $round->id }}" x-data="reveal(@js($payload))"
              class="card mt-6 p-6 text-center">
-            <p class="text-xs uppercase tracking-widest text-slate-400">{{ $round->title }} — Results</p>
+            <p class="text-xs uppercase tracking-widest text-slate-400">{{ $round->title }} — {{ __('Results') }}</p>
             <h2 class="mt-1 text-lg font-black gold-text"
-                x-text="stage === 'done' ? '{{ $winners->count() }} winning ball{{ $winners->count() > 1 ? 's' : '' }} drawn!' : 'Drawing the winners…'"></h2>
+                x-text="stage === 'done' ? '{{ trans_choice(':count winning ball drawn!|:count winning balls drawn!', $winners->count(), ['count' => $winners->count()]) }}' : '{{ __('Drawing the winners…') }}'"></h2>
 
             {{-- Spinning drum while drawing --}}
             <div class="lotto-stage my-4" x-show="stage !== 'done'" x-transition>
@@ -110,14 +122,14 @@
             </div>
 
             <div x-show="stage === 'done'" x-transition>
-                <p class="mt-5 text-sm text-slate-300">Prize pool</p>
-                <p class="text-2xl font-black text-gold-400">{{ $round->prizePool() }} {{ $round->currency }}</p>
+                <p class="mt-5 text-sm text-slate-300">{{ __('Prize pool') }}</p>
+                <p class="text-2xl font-black text-gold-400">{{ number_format($round->prizePool(), 2) }} {{ $round->currency }}</p>
                 @if ($iWon)
                     <div class="pulse-gold mt-4 rounded-xl bg-gold-500/15 p-3 text-sm font-bold text-gold-300">
-                        🎉 You're a winner! Check your DM from the bot.
+                        🎉 {{ __("You're a winner! Check your DM from the bot.") }}
                     </div>
                 @endif
-                <a href="{{ route('history') }}" wire:navigate class="btn-ghost mt-5 w-full">📜 Past rounds</a>
+                <a href="{{ route('history') }}" wire:navigate class="btn-ghost mt-5 w-full">📜 {{ __('Past rounds') }}</a>
             </div>
         </div>
 
@@ -129,25 +141,25 @@
             <div class="flex items-start justify-between">
                 <div>
                     <h2 class="text-lg font-bold">{{ $round->title }}</h2>
-                    <p class="text-sm text-slate-400">{{ $round->ticket_price }} {{ $round->currency }} / ticket
-                        @if ($round->allow_half_tickets)<span class="text-slate-500">· ½ allowed</span>@endif
+                    <p class="text-sm text-slate-400">{{ $round->ticket_price }} {{ $round->currency }} / {{ __('ticket') }}
+                        @if ($round->allow_half_tickets)<span class="text-slate-500">· {{ __('½ allowed') }}</span>@endif
                     </p>
                 </div>
-                <span class="badge bg-emerald-500/15 text-emerald-300">● Open</span>
+                <span class="badge bg-emerald-500/15 text-emerald-300">● {{ __('Open') }}</span>
             </div>
 
             <div class="mt-4 rounded-xl bg-gradient-to-br from-gold-500/15 to-transparent p-4 text-center">
                 <p class="text-xs uppercase tracking-widest text-slate-400">{{ __("Live prize pool") }}</p>
                 <p class="text-3xl font-black tabular-nums gold-text"><span x-data="counter({{ $prizePool }})" x-text="display">{{ $prizePool }}</span> {{ $round->currency }}</p>
                 @if ($round->winners_count > 1)
-                    <p class="mt-1 text-xs text-slate-400">{{ $round->winners_count }} winners share the pot</p>
+                    <p class="mt-1 text-xs text-slate-400">{{ __(':count winners share the pot', ['count' => $round->winners_count]) }}</p>
                 @endif
             </div>
 
             <div class="mt-4">
                 <div class="mb-1 flex justify-between text-xs text-slate-400">
-                    <span>{{ rtrim(rtrim(number_format($soldUnits, 1), '0'), '.') }}/{{ $round->total_tickets }} sold</span>
-                    <span>{{ $remaining }} left</span>
+                    <span>{{ rtrim(rtrim(number_format($soldUnits, 1), '0'), '.') }}/{{ $round->total_tickets }} {{ __('sold') }}</span>
+                    <span>{{ $remaining }} {{ __('left') }}</span>
                 </div>
                 <div class="h-2 w-full overflow-hidden rounded-full bg-white/10">
                     <div class="h-full rounded-full bg-gradient-to-r from-gold-400 to-gold-600 transition-all" style="width: {{ $pct }}%"></div>
@@ -156,11 +168,12 @@
 
             @if ($round->draw_deadline)
                 <div class="mt-4 rounded-xl border border-white/10 p-3 text-center"
-                     x-data="{ target: {{ $round->draw_deadline->getTimestamp() }} * 1000, left: '',
+                     x-data="{ target: {{ $round->draw_deadline->getTimestamp() }} * 1000, left: '', _id: null,
                         tick(){ let d=Math.max(0,this.target-Date.now()); let h=Math.floor(d/3.6e6),m=Math.floor(d%3.6e6/6e4),s=Math.floor(d%6e4/1e3);
-                        this.left=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; } }"
-                     x-init="tick(); setInterval(()=>tick(),1000)">
-                    <p class="text-xs uppercase tracking-widest text-slate-400">Draw in</p>
+                        this.left=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; },
+                        init(){ this.tick(); this._id=setInterval(()=>this.tick(),1000); },
+                        destroy(){ clearInterval(this._id); } }">
+                    <p class="text-xs uppercase tracking-widest text-slate-400">{{ __('Draw in') }}</p>
                     <p class="font-mono text-xl font-bold text-gold-400" x-text="left">--:--:--</p>
                 </div>
             @endif
@@ -196,6 +209,12 @@
                         if (c.s === 'half') return c.mine ? 'cell cell-mine' : 'cell cell-half';
                         return c.mine ? 'cell cell-mine' : 'cell cell-sold';
                     },
+                    cellLabel(c) {
+                        const state = c.s === 'free' ? '{{ __('free') }}'
+                            : (c.s === 'half' ? (c.mine ? '{{ __('your half') }}' : '{{ __('half open') }}')
+                            : (c.mine ? '{{ __('yours') }}' : '{{ __('sold') }}'));
+                        return '{{ __('Number') }} ' + c.n + ' — ' + state;
+                    },
                     confirm() { $wire.buy(this.selFull, this.selHalf); },
                     init() { Livewire.on('cleared', () => { this.selFull = []; this.selHalf = []; }); }
                  }">
@@ -204,17 +223,17 @@
                 <h3 class="font-semibold">{{ __("Pick your numbers") }}</h3>
                 @if ($round->allow_half_tickets)
                     <div class="flex rounded-lg bg-white/5 p-0.5 text-xs">
-                        <button type="button" @click="mode='full'" :class="mode==='full' ? 'bg-gold-500 text-ink-900' : 'text-slate-300'" class="rounded-md px-3 py-1 font-semibold transition">Full</button>
-                        <button type="button" @click="mode='half'" :class="mode==='half' ? 'bg-gold-500 text-ink-900' : 'text-slate-300'" class="rounded-md px-3 py-1 font-semibold transition">½ Half</button>
+                        <button type="button" @click="mode='full'" :class="mode==='full' ? 'bg-gold-500 text-ink-900' : 'text-slate-300'" class="rounded-md px-3 py-1 font-semibold transition">{{ __('Full') }}</button>
+                        <button type="button" @click="mode='half'" :class="mode==='half' ? 'bg-gold-500 text-ink-900' : 'text-slate-300'" class="rounded-md px-3 py-1 font-semibold transition">½ {{ __('Half') }}</button>
                     </div>
                 @endif
             </div>
 
             <div class="mb-2 flex flex-wrap gap-3 text-[10px] text-slate-400">
-                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-400"></span>free</span>
-                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-400"></span>½ open</span>
-                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-400"></span>sold</span>
-                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-gold-400"></span>yours</span>
+                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true"></span>{{ __('free') }}</span>
+                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true"></span>{{ __('half open') }}</span>
+                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-400" aria-hidden="true"></span>{{ __('sold') }}</span>
+                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-gold-400" aria-hidden="true"></span>{{ __('yours') }}</span>
             </div>
 
             <p x-show="inspectMsg" x-text="inspectMsg" class="mb-2 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-slate-300"></p>
@@ -223,10 +242,10 @@
             <div x-show="!board.length" class="grid grid-cols-6 gap-1.5 sm:grid-cols-8">
                 <template x-for="i in 18" :key="i"><div class="cell skeleton"></div></template>
             </div>
-            <div x-show="board.length" class="grid grid-cols-6 gap-1.5 sm:grid-cols-8">
+            <div x-show="board.length" class="grid grid-cols-6 gap-1.5 sm:grid-cols-8" role="group" aria-label="{{ __('Pick your numbers') }}">
                 <template x-for="c in board" :key="c.n">
-                    <button type="button" @click="tap(c)" :class="cellClass(c)">
-                        <span x-text="c.n"></span><span x-show="selHalfQ(c) || (c.s==='half')" class="ml-0.5 text-[9px]">½</span>
+                    <button type="button" @click="tap(c)" :class="cellClass(c)" :aria-label="cellLabel(c)" :aria-pressed="isSel(c)">
+                        <span x-text="c.n"></span><span x-show="selHalfQ(c) || (c.s==='half')" class="ml-0.5 text-[9px]" aria-hidden="true">½</span>
                     </button>
                 </template>
             </div>
@@ -234,29 +253,29 @@
             {{-- Selection summary + buy --}}
             <div class="mt-4 rounded-xl border border-white/10 p-3">
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-slate-400">Selected</span>
-                    <span class="font-semibold"><span x-text="units"></span> ticket(s)</span>
+                    <span class="text-slate-400">{{ __('Selected') }}</span>
+                    <span class="font-semibold"><span x-text="units"></span> {{ __('ticket(s)') }}</span>
                 </div>
                 <div class="mt-1 flex items-center justify-between text-sm">
-                    <span class="text-slate-400">Total</span>
+                    <span class="text-slate-400">{{ __('Total') }}</span>
                     <span class="font-bold text-gold-300"><span x-text="cost"></span> {{ $round->currency }}</span>
                 </div>
 
                 @if ($player)
-                    <p class="mt-2 text-xs text-slate-500">Buying as <span class="text-slate-300">{{ $player->name }}</span>
-                        · Balance <span class="text-gold-300" x-text="balance.toFixed(2)"></span> {{ $round->currency }}</p>
+                    <p class="mt-2 text-xs text-slate-500">{{ __('Buying as') }} <span class="text-slate-300">{{ $player->name }}</span>
+                        · {{ __('Balance') }} <span class="text-gold-300" x-text="balance.toFixed(2)"></span> {{ $round->currency }}</p>
                 @endif
 
                 {{-- Enough balance → buy. Otherwise → top up. --}}
                 <button type="button" x-show="canAfford" @click="confirm()" :disabled="units < 0.5"
                         wire:loading.attr="disabled" wire:target="buy"
                         class="btn-gold mt-3 w-full text-base">
-                    <span wire:loading.remove wire:target="buy">Buy <span x-text="units"></span> ticket(s) · <span x-text="cost"></span> {{ $round->currency }}</span>
-                    <span wire:loading wire:target="buy">Processing…</span>
+                    <span wire:loading.remove wire:target="buy">{{ __('Buy') }} <span x-text="units"></span> {{ __('ticket(s)') }} · <span x-text="cost"></span> {{ $round->currency }}</span>
+                    <span wire:loading wire:target="buy">{{ __('Processing…') }}</span>
                 </button>
                 <a x-show="!canAfford" x-cloak href="{{ route('wallet') }}" wire:navigate
                    class="btn-ghost mt-3 w-full text-amber-300">
-                    💳 Top up wallet to buy (need <span x-text="(costNum - balance).toFixed(2)"></span> {{ $round->currency }} more)
+                    💳 {{ __('Top up wallet to buy') }} (<span x-text="(costNum - balance).toFixed(2)"></span> {{ $round->currency }} {{ __('more') }})
                 </a>
             </div>
         </section>
@@ -264,14 +283,14 @@
         {{-- Referral --}}
         @if ($player)
             <section class="card mt-4 p-4 text-center">
-                <h3 class="font-semibold">👥 Invite & earn free tickets</h3>
+                <h3 class="font-semibold">👥 {{ __('Invite & earn free tickets') }}</h3>
                 <p class="mt-1 text-xs text-slate-400">
-                    {{ $player->referral_count }} invited ·
-                    <span class="text-gold-300">{{ $player->free_tickets }} free ticket(s)</span>
+                    {{ __(':count invited', ['count' => $player->referral_count]) }} ·
+                    <span class="text-gold-300">{{ __(':count free ticket(s)', ['count' => $player->free_tickets]) }}</span>
                 </p>
                 <button type="button" x-data
                         x-on:click="window.luckyShare('Join me on LuckyDraw and win the prize pool! 🎰', '{{ $player->referralLink((string) config('lottery.bot_username')) }}')"
-                        class="btn-ghost mt-3 w-full">📤 Share my invite link</button>
+                        class="btn-ghost mt-3 w-full">📤 {{ __('Share my invite link') }}</button>
             </section>
         @endif
     @endif
@@ -279,5 +298,5 @@
     {{-- Post-purchase share --}}
     <button type="button" x-show="share" x-cloak
             x-on:click="window.luckyShare('I just grabbed tickets ' + share.numbers + ' in ' + share.title + '! Join me 🎰', share.shareUrl)"
-            class="btn-gold mt-4 w-full">📤 Share my tickets</button>
+            class="btn-gold mt-4 w-full">📤 {{ __('Share my tickets') }}</button>
 </div>

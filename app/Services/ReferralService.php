@@ -19,7 +19,19 @@ final class ReferralService
             return; // not their first purchase, or they were not referred
         }
 
-        $referrer = Player::where('referral_code', $buyer->referred_by)->first();
+        // Atomic one-shot claim: only the first concurrent caller flips
+        // null → now() and proceeds, so the referrer is never rewarded twice.
+        $claimed = Player::whereKey($buyer->telegram_id)
+            ->whereNull('referral_rewarded_at')
+            ->update(['referral_rewarded_at' => now()]);
+
+        if ($claimed === 0) {
+            return;
+        }
+
+        $referrer = Player::where('referral_code', $buyer->referred_by)
+            ->where('telegram_id', '!=', $buyer->telegram_id) // no self-referral
+            ->first();
 
         if ($referrer === null) {
             return;

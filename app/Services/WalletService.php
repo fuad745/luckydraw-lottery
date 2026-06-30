@@ -9,6 +9,7 @@ use App\Enums\TransactionType;
 use App\Exceptions\InsufficientBalanceException;
 use App\Models\Player;
 use App\Models\Transaction;
+use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 
 final class WalletService
@@ -36,18 +37,21 @@ final class WalletService
 
     private function move(int $telegramId, float $amount, TransactionType $type, bool $isCredit, array $attrs): Transaction
     {
-        $amount = round($amount, 2);
+        $amountCents = Money::toCents($amount);
+        $amount = Money::toAmount($amountCents);
 
-        return DB::transaction(function () use ($telegramId, $amount, $type, $isCredit, $attrs): Transaction {
+        return DB::transaction(function () use ($telegramId, $amount, $amountCents, $type, $isCredit, $attrs): Transaction {
             $player = Player::whereKey($telegramId)->lockForUpdate()->firstOrFail();
 
-            if (! $isCredit && (float) $player->balance < $amount) {
+            $balanceCents = Money::toCents($player->balance);
+
+            if (! $isCredit && $balanceCents < $amountCents) {
                 throw new InsufficientBalanceException(
                     'Insufficient balance. You have '.number_format((float) $player->balance, 2).' but need '.number_format($amount, 2).'.'
                 );
             }
 
-            $player->balance = round((float) $player->balance + ($isCredit ? $amount : -$amount), 2);
+            $player->balance = Money::toAmount($isCredit ? $balanceCents + $amountCents : $balanceCents - $amountCents);
             $player->save();
 
             return Transaction::create([

@@ -29,6 +29,11 @@
 
     [x-cloak] { display: none !important; }
 
+    /* Visible keyboard focus across the dark theme (a11y) — pointer clicks stay clean. */
+    a:focus-visible, button:focus-visible, [role="button"]:focus-visible, select:focus-visible, input:focus-visible {
+        @apply outline-none ring-2 ring-gold-400/60 ring-offset-2 ring-offset-ink-900;
+    }
+
     body {
         @apply bg-ink-900 text-slate-100 antialiased;
         background-image:
@@ -68,6 +73,11 @@
 
     .label {
         @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400;
+    }
+
+    /* Visible keyboard focus ring over the dark theme (a11y). */
+    .focus-ring {
+        @apply outline-none focus-visible:ring-2 focus-visible:ring-gold-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900;
     }
 
     /* Live ticket board cells */

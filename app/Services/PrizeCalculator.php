@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\Money;
+
 final class PrizeCalculator
 {
     /**
@@ -19,31 +21,33 @@ final class PrizeCalculator
      */
     public function distribute(float $pot, float $ticketPrice, array $structure): array
     {
+        $potCents = Money::toCents($pot);
+        $priceCents = Money::toCents($ticketPrice);
+
         $raw = [];
         foreach ($structure as $tier) {
-            $raw[] = max(0.0, $this->tierAmount($pot, $ticketPrice, $tier));
+            $raw[] = max(0, $this->tierCents($potCents, $priceCents, $tier));
         }
 
         $total = array_sum($raw);
 
         // Never pay out more than the pot — scale down proportionally if over-configured.
-        if ($total > $pot && $total > 0) {
-            $scale = $pot / $total;
-            $raw = array_map(fn ($a) => $a * $scale, $raw);
+        if ($total > $potCents && $total > 0) {
+            $raw = Money::allocate($potCents, array_map(fn ($c) => (float) $c, $raw));
         }
 
-        $tiers = array_map(fn ($a) => round($a, 2), $raw);
-        $admin = round(max(0.0, $pot - array_sum($tiers)), 2);
+        $tiers = array_map(fn ($c) => Money::toAmount($c), $raw);
+        $adminCents = max(0, $potCents - array_sum($raw));
 
-        return ['tiers' => $tiers, 'admin' => $admin];
+        return ['tiers' => $tiers, 'admin' => Money::toAmount($adminCents)];
     }
 
-    private function tierAmount(float $pot, float $ticketPrice, array $tier): float
+    private function tierCents(int $potCents, int $priceCents, array $tier): int
     {
         return match ($tier['type'] ?? 'percent') {
-            'ticket_price' => $ticketPrice,
-            'fixed' => (float) ($tier['value'] ?? 0),
-            default => $pot * ((float) ($tier['value'] ?? 0)) / 100,
+            'ticket_price' => $priceCents,
+            'fixed' => Money::toCents($tier['value'] ?? 0),
+            default => (int) round($potCents * ((float) ($tier['value'] ?? 0)) / 100),
         };
     }
 

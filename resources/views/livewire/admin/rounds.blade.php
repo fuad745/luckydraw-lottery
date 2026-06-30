@@ -41,16 +41,53 @@
                 @endif
             @endif
 
-            <h2 class="mb-2 mt-6 font-semibold text-slate-100">Recent rounds</h2>
-            <div class="divide-y divide-white/5">
-                @forelse ($recent as $r)
-                    <div class="flex items-center justify-between py-2 text-sm">
-                        <span class="text-slate-200">{{ $r->title }}</span>
-                        <span class="text-xs {{ $r->status->color() }}">{{ $r->status->label() }}</span>
-                    </div>
-                @empty
-                    <p class="py-3 text-sm text-slate-500">No rounds yet.</p>
-                @endforelse
+            <div class="mb-2 mt-6 flex items-center justify-between">
+                <h2 class="font-semibold text-slate-100">Recent rounds — P&amp;L</h2>
+                <span class="text-[10px] uppercase tracking-wide text-slate-500">sales · prizes · house</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-[10px] uppercase tracking-wide text-slate-500">
+                            <th class="py-1 pr-2 font-medium">Round</th>
+                            <th class="py-1 px-1 text-right font-medium">Sales</th>
+                            <th class="py-1 px-1 text-right font-medium">Prizes</th>
+                            <th class="py-1 px-1 text-right font-medium">Refunds</th>
+                            <th class="py-1 pl-1 text-right font-medium">House</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        @forelse ($recent as $r)
+                            @php $p = $pnl[$r->id] ?? ['sales' => 0, 'prizes' => 0, 'refunds' => 0, 'house' => 0, 'balanced' => true]; @endphp
+                            <tr>
+                                <td class="py-2 pr-2">
+                                    <span class="text-slate-200">{{ $r->title }}</span>
+                                    <span class="ml-1 text-[10px] {{ $r->status->color() }}">● {{ $r->status->label() }}</span>
+                                    @unless ($p['balanced'])
+                                        <span class="ml-1 text-[10px] text-rose-400" title="Sales − prizes − refunds ≠ house cut">⚠︎</span>
+                                    @endunless
+                                </td>
+                                <td class="py-2 px-1 text-right tabular-nums text-emerald-300">{{ number_format($p['sales'], 2) }}</td>
+                                <td class="py-2 px-1 text-right tabular-nums text-rose-300">{{ number_format($p['prizes'], 2) }}</td>
+                                <td class="py-2 px-1 text-right tabular-nums text-slate-400">{{ number_format($p['refunds'], 2) }}</td>
+                                <td class="py-2 pl-1 text-right tabular-nums font-semibold text-gold-300">{{ number_format($p['house'], 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="py-3 text-sm text-slate-500">No rounds yet.</td></tr>
+                        @endforelse
+                    </tbody>
+                    @if (count($recent))
+                        <tfoot>
+                            <tr class="border-t border-white/10 text-[11px] font-semibold">
+                                <td class="py-2 pr-2 text-slate-400">Totals</td>
+                                <td class="py-2 px-1 text-right tabular-nums text-emerald-300">{{ number_format(collect($pnl)->sum('sales'), 2) }}</td>
+                                <td class="py-2 px-1 text-right tabular-nums text-rose-300">{{ number_format(collect($pnl)->sum('prizes'), 2) }}</td>
+                                <td class="py-2 px-1 text-right tabular-nums text-slate-400">{{ number_format(collect($pnl)->sum('refunds'), 2) }}</td>
+                                <td class="py-2 pl-1 text-right tabular-nums text-gold-300">{{ number_format(collect($pnl)->sum('house'), 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    @endif
+                </table>
             </div>
         </section>
 

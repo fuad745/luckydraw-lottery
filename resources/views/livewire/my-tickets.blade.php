@@ -1,18 +1,18 @@
-<div>
+<div wire:poll.30s.visible>
     <header class="mb-4">
-        <h1 class="text-2xl font-black gold-text">🎫 My Tickets</h1>
-        <p class="text-xs text-slate-400">Every ticket you own, across all rounds.</p>
+        <h1 class="text-2xl font-black gold-text">🎫 {{ __('My Tickets') }}</h1>
+        <p class="text-xs text-slate-400">{{ __('Every ticket you own, across all rounds.') }}</p>
     </header>
 
     @if ($player === null)
         <div class="card p-8 text-center text-sm text-slate-400">
-            Open this app from Telegram to see your tickets.
+            {{ __('Open this app from Telegram to see your tickets.') }}
         </div>
     @elseif ($grouped->isEmpty())
         <div class="card p-8 text-center">
             <div class="text-4xl">🎟</div>
-            <p class="mt-2 text-sm text-slate-400">You haven't bought any tickets yet.</p>
-            <a href="{{ route('home') }}" wire:navigate class="btn-gold mt-4">Buy your first ticket</a>
+            <p class="mt-2 text-sm text-slate-400">{{ __("You haven't bought any tickets yet.") }}</p>
+            <a href="{{ route('home') }}" wire:navigate class="btn-gold mt-4">{{ __('Buy your first ticket') }}</a>
         </div>
     @else
         @foreach ($grouped as $title => $tickets)
@@ -22,7 +22,7 @@
                     @foreach ($tickets as $t)
                         @php
                             $iAmCoOwner = $t->co_owner_telegram_id === $myId;
-                            $myStake = $t->is_split ? '½' : 'full';
+                            $myStake = $t->is_split ? '½' : __('full');
                             // Your share of the prize if this ticket won.
                             $myPrize = $t->is_winner ? ($t->is_split ? round((float) $t->prize_amount / 2, 2) : (float) $t->prize_amount) : 0;
                             $medal = ['🥇','🥈','🥉'][($t->win_rank ?? 0) - 1] ?? '🏆';
@@ -34,12 +34,12 @@
                             </div>
                             <div class="flex flex-col items-end gap-1">
                                 @if ($t->is_winner)
-                                    <span class="badge bg-gold-500/20 text-gold-300">{{ $medal }} #{{ $t->win_rank }} · {{ $myPrize }} {{ $t->round->currency }}</span>
+                                    <span class="badge bg-gold-500/20 text-gold-300">{{ $medal }} #{{ $t->win_rank }} · {{ number_format((float) $myPrize, 2) }} {{ $t->round->currency }}</span>
                                 @elseif ($t->round->status->value === 'closed')
-                                    <span class="badge bg-slate-500/15 text-slate-400">No win</span>
+                                    <span class="badge bg-slate-500/15 text-slate-400">{{ __('No win') }}</span>
                                 @endif
                                 @if ($t->is_split)
-                                    <span class="badge bg-indigo-500/20 text-indigo-300">🤝 {{ $iAmCoOwner ? 'co-owner' : ($t->co_owner_telegram_id ? 'shared' : '½ open') }}</span>
+                                    <span class="badge bg-indigo-500/20 text-indigo-300">🤝 {{ $iAmCoOwner ? __('co-owner') : ($t->co_owner_telegram_id ? __('shared') : __('½ open')) }}</span>
                                 @endif
                                 <span class="text-[10px] text-slate-500">{{ $t->purchased_at?->diffForHumans() }}</span>
                             </div>

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Enums\TransactionType;
 use App\Models\Round;
+use App\Models\Transaction;
 use App\Services\LotteryService;
 use App\Services\PrizeCalculator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -131,12 +134,53 @@ final class Rounds extends Component
         $pot = round($this->totalTickets * $this->ticketPrice, 2);
         $preview = $calculator->distribute($pot, $this->ticketPrice, $this->prizeStructure());
 
+        $recent = Round::latest('id')->limit(12)->get();
+
         return view('livewire.admin.rounds', [
             'current' => Round::current(),
-            'recent' => Round::latest('id')->limit(12)->get(),
+            'recent' => $recent,
+            'pnl' => $this->profitAndLoss($recent),
             'previewPot' => $pot,
             'previewTiers' => $preview['tiers'],
             'previewAdmin' => $preview['admin'],
         ]);
+    }
+
+    /**
+     * Per-round reconciliation: sales in, prizes + refunds out, house cut, and a
+     * balance check (sales − prizes − refunds should equal the house cut).
+     *
+     * @param  Collection<int,Round>  $rounds
+     * @return array<int,array{sales:float,prizes:float,refunds:float,house:float,balanced:bool}>
+     */
+    private function profitAndLoss($rounds): array
+    {
+        $byRound = Transaction::whereIn('round_id', $rounds->pluck('id'))
+            ->selectRaw('round_id, type, SUM(amount) as total')
+            ->groupBy('round_id', 'type')
+            ->get()
+            ->groupBy('round_id');
+
+        $pnl = [];
+        foreach ($rounds as $round) {
+            $rows = $byRound->get($round->id) ?? collect();
+            $sum = fn (TransactionType $t): float => (float) ($rows->firstWhere('type', $t->value)->total ?? 0);
+
+            $sales = $sum(TransactionType::Purchase);
+            $prizes = $sum(TransactionType::Winning);
+            $refunds = $sum(TransactionType::Refund);
+            $house = (float) $round->admin_cut;
+
+            $pnl[$round->id] = [
+                'sales' => $sales,
+                'prizes' => $prizes,
+                'refunds' => $refunds,
+                'house' => $house,
+                // Within a cent = reconciled (the integer-cents math should make it exact).
+                'balanced' => abs($sales - $prizes - $refunds - $house) < 0.01,
+            ];
+        }
+
+        return $pnl;
     }
 }
