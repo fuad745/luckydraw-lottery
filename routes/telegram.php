@@ -3,6 +3,7 @@
 /** @var Nutgram $bot */
 
 use App\Enums\RoundStatus;
+use App\Models\Player;
 use App\Models\Round;
 use App\Services\DepositService;
 use App\Services\PaymentMessageParser;
@@ -74,7 +75,8 @@ $bot->onCommand('help', function (Nutgram $bot): void {
             "5️⃣ Winners are paid straight to their wallet — cash out anytime.\n\n".
             "🏆 Multiple winners share the pot by tier; ½-tickets split their share.\n".
             "👥 Invite friends with your referral link for free tickets!\n\n".
-            'Commands: /start /balance /mytickets /results /help',
+            "💵 <i>To deposit fast: just paste your Telebirr/CBE/M-Pesa payment SMS into this chat.</i>\n\n".
+            'Commands: /start /balance /mytickets /results /leaderboard /help',
         parse_mode: ParseMode::HTML,
     );
 });
@@ -155,6 +157,51 @@ $bot->onCommand('results', function (Nutgram $bot): void {
         text: "🏆 <b>Latest results — {$round->title}</b>\n\n{$lines}\n\nPrize pool: <b>{$round->prizePool()} {$round->currency}</b>",
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('📜 View history', 'history'),
+    );
+});
+
+/*
+| /leaderboard — top inviters and top winners, for a little social pull.
+*/
+$bot->onCommand('leaderboard', function (Nutgram $bot): void {
+    $currency = config('lottery.currency');
+    $medal = static fn (int $i): string => ['🥇', '🥈', '🥉'][$i] ?? '🏅';
+
+    $inviters = Player::where('referral_count', '>', 0)
+        ->orderByDesc('referral_count')->limit(5)->get(['name', 'referral_count']);
+
+    $winners = Player::where('total_winnings', '>', 0)
+        ->orderByDesc('total_winnings')->limit(5)->get(['name', 'total_winnings']);
+
+    if ($inviters->isEmpty() && $winners->isEmpty()) {
+        $bot->sendMessage(
+            text: "📊 The leaderboard is empty — be the first!\nInvite friends and win draws to climb it.",
+            reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
+        );
+
+        return;
+    }
+
+    $sections = [];
+
+    if ($inviters->isNotEmpty()) {
+        $lines = $inviters->values()->map(
+            fn ($p, $i) => $medal($i).' '.e($p->name)." — <b>{$p->referral_count}</b> invited"
+        )->implode("\n");
+        $sections[] = "👥 <b>Top inviters</b>\n{$lines}";
+    }
+
+    if ($winners->isNotEmpty()) {
+        $lines = $winners->values()->map(
+            fn ($p, $i) => $medal($i).' '.e($p->name).' — <b>'.number_format((float) $p->total_winnings, 2)." {$currency}</b>"
+        )->implode("\n");
+        $sections[] = "🏆 <b>Top winners</b>\n{$lines}";
+    }
+
+    $bot->sendMessage(
+        text: "📊 <b>LuckyDraw Leaderboard</b>\n\n".implode("\n\n", $sections),
+        parse_mode: ParseMode::HTML,
+        reply_markup: MiniApp::button('🎟 Play & climb the board'),
     );
 });
 

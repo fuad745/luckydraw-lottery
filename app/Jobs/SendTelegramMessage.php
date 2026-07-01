@@ -60,6 +60,17 @@ final class SendTelegramMessage implements ShouldQueue
             return;
         }
 
+        // 429 = rate limited. Honour Telegram's requested cool-off instead of a
+        // fixed backoff, then retry (up to $tries) without marking it failed.
+        if ($response->status() === 429) {
+            $retryAfter = (int) ($response->json('parameters.retry_after')
+                ?? $response->header('Retry-After')
+                ?? $this->backoff);
+            $this->release(max(1, $retryAfter));
+
+            return;
+        }
+
         $this->log('failed', $response->json('description') ?? 'http '.$response->status());
         $response->throw();
     }

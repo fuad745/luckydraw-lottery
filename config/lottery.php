@@ -36,6 +36,12 @@ return [
     'bot_username' => env('TELEGRAM_BOT_USERNAME'),
     'mini_app_url' => env('MINI_APP_URL', env('APP_URL')),
 
+    // Optional defense-in-depth: a secret Telegram echoes back in the
+    // X-Telegram-Bot-Api-Secret-Token header on every webhook call. Set it here
+    // and register it with `php artisan lottery:telegram-setup --webhook`.
+    // Leave blank to rely on the token-in-URL guard only.
+    'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+
     // Public channel/group where winner results are posted (e.g. @luckydraw or -100123...).
     // Optional — leave blank to skip channel posts. The bot must be an admin of the channel.
     'channel_id' => env('TELEGRAM_CHANNEL_ID'),

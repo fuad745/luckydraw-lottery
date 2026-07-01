@@ -8,6 +8,12 @@ use App\Jobs\SendTelegramMessage;
 
 final class TelegramNotifier
 {
+    /**
+     * Milliseconds between queued messages in a broadcast. ~25 msg/s keeps us
+     * under Telegram's ~30 msg/s global bulk limit without hitting 429s.
+     */
+    private const BROADCAST_SPACING_MS = 40;
+
     /** Queue a single message to one Telegram user. */
     public function send(int|string $telegramId, string $message, ?string $type = null, ?int $roundId = null): void
     {
@@ -27,6 +33,7 @@ final class TelegramNotifier
     public function broadcast(iterable $telegramIds, string $message, ?string $type = null, ?int $roundId = null): void
     {
         $seen = [];
+        $i = 0;
 
         foreach ($telegramIds as $id) {
             $id = (int) $id;
@@ -34,7 +41,12 @@ final class TelegramNotifier
                 continue;
             }
             $seen[$id] = true;
-            $this->send($id, $message, $type, $roundId);
+
+            // Stagger dispatch so a large broadcast trickles out under Telegram's
+            // rate limit rather than firing all at once and tripping 429s.
+            SendTelegramMessage::dispatch($id, $message, $type, $roundId)
+                ->delay(now()->addMilliseconds($i * self::BROADCAST_SPACING_MS));
+            $i++;
         }
     }
 
