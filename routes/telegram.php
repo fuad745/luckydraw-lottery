@@ -76,7 +76,7 @@ $bot->onCommand('help', function (Nutgram $bot): void {
             "🏆 Multiple winners share the pot by tier; ½-tickets split their share.\n".
             "👥 Invite friends with your referral link for free tickets!\n\n".
             "💵 <i>To deposit fast: just paste your Telebirr/CBE/M-Pesa payment SMS into this chat.</i>\n\n".
-            'Commands: /start /balance /mytickets /results /leaderboard /help',
+            'Commands: /start /balance /deposit /mytickets /results /leaderboard /help',
         parse_mode: ParseMode::HTML,
     );
 });
@@ -125,6 +125,21 @@ $bot->onCommand('balance', function (Nutgram $bot) use ($player): void {
 
     $bot->sendMessage(
         text: "👛 <b>Your wallet</b>\nBalance: <b>".number_format((float) $me->balance, 2).' '.config('lottery.currency')."</b>\n\nTop up, play, or cash out in the app.",
+        parse_mode: ParseMode::HTML,
+        reply_markup: MiniApp::button('👛 Open Wallet', 'wallet'),
+    );
+});
+
+/*
+| /deposit — discoverable entry point for the paste-your-SMS deposit flow.
+*/
+$bot->onCommand('deposit', function (Nutgram $bot): void {
+    $bot->sendMessage(
+        text: "💵 <b>Add funds</b>\n\n".
+            'Send your top-up to our Telebirr / CBE / M-Pesa account, then simply '.
+            "<b>paste the confirmation SMS or receipt link right here</b> — I'll read the ".
+            "transaction number, verify it, and credit your wallet automatically.\n\n".
+            'Prefer buttons? Open the wallet 👇',
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('👛 Open Wallet', 'wallet'),
     );

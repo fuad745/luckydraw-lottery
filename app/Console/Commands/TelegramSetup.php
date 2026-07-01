@@ -30,6 +30,7 @@ final class TelegramSetup extends Command
     private const COMMANDS = [
         ['start', 'Open LuckyDraw and get your referral link'],
         ['balance', 'Check your wallet balance'],
+        ['deposit', 'Add funds — paste your payment SMS'],
         ['mytickets', 'See your tickets'],
         ['results', 'Latest draw results'],
         ['leaderboard', 'Top inviters and winners'],

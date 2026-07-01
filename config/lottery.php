@@ -53,6 +53,9 @@ return [
     */
     'currency' => env('LOTTERY_CURRENCY', 'ETB'),
 
+    // How long to keep Telegram delivery logs before they are pruned daily.
+    'notifications_retention_days' => (int) env('LOTTERY_NOTIFICATIONS_RETENTION_DAYS', 30),
+
     // Seconds of suspense between locking sales and revealing the winner.
     'draw_suspense_seconds' => (int) env('LOTTERY_DRAW_SUSPENSE', 10),
 
