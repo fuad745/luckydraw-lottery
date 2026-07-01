@@ -14,6 +14,7 @@ use App\Models\Round;
 use App\Models\Ticket;
 use App\Models\Transaction;
 use App\Support\Money;
+use App\Telegram\MiniApp;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -62,10 +63,10 @@ final class LotteryService
             "🏆 {$round->winners_count} winner(s)\n".
             'Open the app and grab your lucky numbers! 🍀';
 
-        $this->notifier->toChannel($round->channelId(), $msg, 'round_started', $round->id);
+        $this->notifier->toChannel($round->channelId(), $msg, 'round_started', $round->id, MiniApp::chatLinkButton('🎟 Play now'));
 
         if (config('lottery.announce_to_players')) {
-            $this->notifier->broadcast(Player::pluck('telegram_id'), $msg, 'round_started', $round->id);
+            $this->notifier->broadcast(Player::pluck('telegram_id'), $msg, 'round_started', $round->id, MiniApp::webAppButton('🎟 Play now'));
         }
     }
 
@@ -286,12 +287,14 @@ final class LotteryService
             "🔔 <b>{$round->title}</b>\nSales are closed — the draw is starting NOW 🎰\nOpen the app to watch the balls roll!",
             'draw_starting',
             $round->id,
+            MiniApp::webAppButton('👀 Watch live'),
         );
         $this->notifier->toChannel(
             $round->channelId(),
             "🎰 <b>{$round->title}</b> — the draw is starting now! Winners announced in moments…",
             'draw_starting',
             $round->id,
+            MiniApp::chatLinkButton('👀 Watch live'),
         );
 
         $delay = (int) config('lottery.draw_suspense_seconds', 10);
@@ -539,6 +542,7 @@ final class LotteryService
                 "🎉 <b>YOU WON!</b> {$medal}\nYou placed <b>#{$rank}</b> in <b>{$round->title}</b>.\n💰 Your prize: <b>{$amount} {$round->currency}</b>\n\nThe organiser will arrange your payout. Congratulations! 🥳",
                 'win',
                 $round->id,
+                MiniApp::webAppButton('👛 Open Wallet', 'wallet'),
             );
         }
 
@@ -555,6 +559,7 @@ final class LotteryService
             "🎰🏆 <b>{$round->title} — RESULTS</b>\n\n{$lines}\n\n💰 Prize pool: {$round->prizePool()} {$round->currency}\nCongratulations to the winners! 🎉",
             'draw_result',
             $round->id,
+            MiniApp::chatLinkButton('🎟 Join the next round'),
         );
     }
 

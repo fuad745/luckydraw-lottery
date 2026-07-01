@@ -20,12 +20,16 @@ final class SendTelegramMessage implements ShouldQueue
 
     public int $backoff = 10;
 
-    /** @param int|string $chatId numeric user id, or a channel id / @username */
+    /**
+     * @param  int|string  $chatId  numeric user id, or a channel id / @username
+     * @param  array<string,mixed>|null  $replyMarkup  raw Telegram reply_markup
+     */
     public function __construct(
         public readonly int|string $chatId,
         public readonly string $message,
         public readonly ?string $type = null,
         public readonly ?int $roundId = null,
+        public readonly ?array $replyMarkup = null,
     ) {}
 
     public function handle(): void
@@ -38,14 +42,19 @@ final class SendTelegramMessage implements ShouldQueue
             return;
         }
 
+        $payload = [
+            'chat_id' => $this->chatId,
+            'text' => $this->message,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ];
+        if ($this->replyMarkup !== null) {
+            $payload['reply_markup'] = $this->replyMarkup;
+        }
+
         $response = Http::asJson()
             ->timeout(15)
-            ->post("https://api.telegram.org/bot{$token}/sendMessage", [
-                'chat_id' => $this->chatId,
-                'text' => $this->message,
-                'parse_mode' => 'HTML',
-                'disable_web_page_preview' => true,
-            ]);
+            ->post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
 
         if ($response->successful()) {
             $this->log('sent');

@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Jobs\SendTelegramMessage;
 use App\Services\TelegramNotifier;
+use App\Telegram\MiniApp;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -38,5 +39,18 @@ final class TelegramNotifierTest extends TestCase
 
         $this->assertCount(3, $delays);
         $this->assertTrue($delays[0] < $delays[1] && $delays[1] < $delays[2], 'broadcast should stagger dispatch');
+    }
+
+    public function test_reply_markup_is_passed_through_to_the_job(): void
+    {
+        Queue::fake();
+
+        $markup = MiniApp::webAppButton('Play', 'wallet');
+        app(TelegramNotifier::class)->send(111, 'hi', 'win', null, $markup);
+
+        Queue::assertPushed(
+            SendTelegramMessage::class,
+            fn (SendTelegramMessage $job) => $job->replyMarkup === $markup,
+        );
     }
 }
