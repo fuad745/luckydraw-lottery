@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 final class WalletService
 {
     /** Add funds to a player's wallet and record the ledger entry. */
-    public function credit(int $telegramId, float $amount, TransactionType $type, array $attrs = []): Transaction
+    public function credit(int|string $telegramId, float $amount, TransactionType $type, array $attrs = []): Transaction
     {
         return $this->move($telegramId, abs($amount), $type, true, $attrs);
     }
@@ -25,17 +25,19 @@ final class WalletService
      *
      * @throws InsufficientBalanceException
      */
-    public function debit(int $telegramId, float $amount, TransactionType $type, array $attrs = []): Transaction
+    public function debit(int|string $telegramId, float $amount, TransactionType $type, array $attrs = []): Transaction
     {
         return $this->move($telegramId, abs($amount), $type, false, $attrs);
     }
 
-    public function balance(int $telegramId): float
+    public function balance(int|string $telegramId): float
     {
         return (float) (Player::whereKey($telegramId)->value('balance') ?? 0);
     }
 
-    private function move(int $telegramId, float $amount, TransactionType $type, bool $isCredit, array $attrs): Transaction
+    // 64-bit Telegram ids are stored/cast as strings (see Player::$casts), so the
+    // key is accepted as int|string and only ever used for keyed lookups below.
+    private function move(int|string $telegramId, float $amount, TransactionType $type, bool $isCredit, array $attrs): Transaction
     {
         $amountCents = Money::toCents($amount);
         $amount = Money::toAmount($amountCents);

@@ -4,10 +4,14 @@
 
 use App\Enums\RoundStatus;
 use App\Models\Round;
+use App\Services\DepositService;
+use App\Services\PaymentMessageParser;
 use App\Services\PlayerService;
 use App\Support\Phone;
 use App\Telegram\MiniApp;
+use Illuminate\Validation\ValidationException;
 use SergiX44\Nutgram\Nutgram;
+use SergiX44\Nutgram\Telegram\Properties\ChatAction;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 
 /*
@@ -213,11 +217,69 @@ $bot->onContact(function (Nutgram $bot) use ($player): void {
 });
 
 /*
-| Fallback for unknown messages.
+| Deposit by DM — a player can just paste their payment SMS or receipt link
+| (Telebirr / CBE / CBE Birr / M-Pesa) into the chat and we verify + credit it,
+| no Mini App needed. Returns true when the text was a recognisable payment
+| message we handled (success or a friendly error), false otherwise.
 */
-$bot->fallback(function (Nutgram $bot): void {
+$tryDeposit = static function (Nutgram $bot, string $text) use ($player): bool {
+    // Only auto-credit when the message carries a confident provider signal
+    // (a receipt link, an FT reference, or an M-Pesa marker). Ambiguous bare
+    // codes are left to the Mini App, where the method is chosen explicitly.
+    $parsed = app(PaymentMessageParser::class)->parse($text);
+    if ($parsed['provider'] === null || $parsed['reference'] === null) {
+        return false;
+    }
+
+    $bot->sendChatAction(ChatAction::TYPING);
+    $me = $player($bot);
+
+    try {
+        // DepositService re-parses the full text itself; we pass the detected
+        // provider and skip its queued notice in favour of the reply below.
+        $tx = app(DepositService::class)->deposit($me, $parsed['provider'], $text, notify: false);
+    } catch (ValidationException $e) {
+        $bot->sendMessage(
+            text: '⚠️ '.e((string) collect($e->errors())->flatten()->first()),
+            parse_mode: ParseMode::HTML,
+            reply_markup: MiniApp::button('👛 Open Wallet', 'wallet'),
+        );
+
+        return true;
+    } catch (Throwable $e) {
+        report($e);
+        $bot->sendMessage(text: '⚠️ We could not verify that just now. Please try again shortly.');
+
+        return true;
+    }
+
     $bot->sendMessage(
-        text: "🤖 I didn't get that. Use /start to open the game or /help to learn how to play.",
+        text: "✅ <b>Deposit confirmed!</b>\n+".number_format((float) $tx->amount, 2).' '.config('lottery.currency').
+            "\n💼 New balance: <b>".number_format((float) $me->fresh()->balance, 2).' '.config('lottery.currency').'</b>',
+        parse_mode: ParseMode::HTML,
+        reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
+    );
+
+    return true;
+};
+
+/*
+| Fallback for unknown messages. First tries to read the text as a pasted
+| payment message (deposit by DM); otherwise shows the generic help.
+*/
+$bot->fallback(function (Nutgram $bot) use ($tryDeposit): void {
+    // Deposits only make sense in a 1:1 chat, never in groups/channels.
+    $text = $bot->message()?->text;
+    $isPrivate = $bot->chat()?->isPrivate() ?? false;
+
+    if ($isPrivate && $text !== null && $tryDeposit($bot, $text)) {
+        return;
+    }
+
+    $bot->sendMessage(
+        text: "🤖 I didn't get that. Use /start to open the game or /help to learn how to play.\n\n".
+            '💡 <i>Tip: to deposit, just paste your Telebirr/CBE/M-Pesa payment SMS or receipt link here.</i>',
+        parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
     );
 });

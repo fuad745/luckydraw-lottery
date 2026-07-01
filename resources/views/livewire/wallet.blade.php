@@ -54,15 +54,17 @@
                 @endforeach
             </select>
 
-            <label class="label" for="dep-reference">{{ __('Transaction reference') }}</label>
-            <input id="dep-reference" type="text" wire:model="reference" class="input" placeholder="e.g. FT253089F68Z">
+            <label class="label" for="dep-reference">{{ __('Transaction SMS, link, or number') }}</label>
+            <textarea id="dep-reference" rows="3" wire:model="reference" class="input resize-none"
+                      placeholder="{{ __('Paste your full payment SMS or receipt link here — or just the transaction number.') }}"></textarea>
+            <p class="mt-1 text-[11px] text-slate-500">{{ __('Tip: copy the whole confirmation message from :sender — we pull out the transaction number automatically.', ['sender' => '127 / CBE / M-PESA']) }}</p>
 
             @if ($provider === 'cbe')
-                <label class="label mt-3" for="dep-suffix">{{ __('Account suffix (last digits)') }}</label>
-                <input id="dep-suffix" type="text" wire:model="suffix" class="input" placeholder="e.g. 16825193">
+                <label class="label mt-3" for="dep-suffix">{{ __('Account suffix (last digits) — optional') }}</label>
+                <input id="dep-suffix" type="text" wire:model="suffix" class="input" placeholder="{{ __('Auto-filled from your SMS if present') }}">
             @elseif (in_array($provider, ['cbebirr', 'mpesa']))
-                <label class="label mt-3" for="dep-phone">{{ __('Your phone number') }}</label>
-                <input id="dep-phone" type="tel" wire:model="payerPhone" class="input" placeholder="+2519XXXXXXXX">
+                <label class="label mt-3" for="dep-phone">{{ __('Your phone number — optional') }}</label>
+                <input id="dep-phone" type="tel" wire:model="payerPhone" class="input" placeholder="{{ __('Auto-filled from your SMS if present') }}">
             @endif
 
             <button wire:click="deposit" wire:loading.attr="disabled" wire:target="deposit" @unless ($verifyReady) disabled @endunless class="btn-gold mt-4 w-full disabled:opacity-50">

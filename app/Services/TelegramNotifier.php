@@ -9,9 +9,10 @@ use App\Jobs\SendTelegramMessage;
 final class TelegramNotifier
 {
     /** Queue a single message to one Telegram user. */
-    public function send(int $telegramId, string $message, ?string $type = null, ?int $roundId = null): void
+    public function send(int|string $telegramId, string $message, ?string $type = null, ?int $roundId = null): void
     {
-        if ($telegramId <= 0) {
+        // 64-bit ids are stored as strings (see Player::$casts); accept both.
+        if (! is_numeric($telegramId) || (int) $telegramId <= 0) {
             return;
         }
 

@@ -87,7 +87,7 @@ return [
 
         // Where players send deposits — shown as instructions in the app.
         'deposit_instructions' => env('LOTTERY_DEPOSIT_INSTRUCTIONS',
-            'Send the amount to our Telebirr/CBE account, then paste the transaction reference below.'),
+            'Send the amount to our Telebirr/CBE account, then copy the confirmation SMS (or receipt link) and paste it below — we pull out the transaction number for you.'),
     ],
 
 ];

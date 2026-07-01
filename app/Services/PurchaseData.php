@@ -16,7 +16,7 @@ final readonly class PurchaseData
      * @param  array<int,array{number:int,half:bool}>  $picks
      */
     public function __construct(
-        public int $buyerTelegramId,
+        public int|string $buyerTelegramId,
         public string $buyerName,
         public ?string $buyerPhone = null,
         public ?string $buyerUsername = null,

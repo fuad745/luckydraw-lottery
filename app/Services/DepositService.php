@@ -18,6 +18,7 @@ final class DepositService
         private readonly PaymentVerifier $verifier,
         private readonly WalletService $wallet,
         private readonly TelegramNotifier $notifier,
+        private readonly PaymentMessageParser $parser,
     ) {}
 
     /**
@@ -28,19 +29,31 @@ final class DepositService
      *
      * @throws ValidationException
      */
-    public function deposit(Player $player, string $provider, string $reference, array $opts = []): Transaction
+    public function deposit(Player $player, string $provider, string $reference, array $opts = [], bool $notify = true): Transaction
     {
         $provider = strtolower(trim($provider));
-        $reference = trim($reference);
 
         if ($player->isBanned()) {
             throw ValidationException::withMessages(['reference' => 'Your account is suspended.']);
         }
+
+        // The player may paste a whole payment SMS or a receipt link — pull the
+        // reference (and any CBE suffix / payer phone) out of it. A strongly
+        // detected provider (from a receipt link or an FT reference) corrects a
+        // mis-selected payment method.
+        $parsed = $this->parser->parse($reference, $provider);
+        $reference = trim((string) ($parsed['reference'] ?? $reference));
+        if ($parsed['provider'] !== null) {
+            $provider = $parsed['provider'];
+        }
+        $opts['suffix'] = ($opts['suffix'] ?? null) ?: $parsed['suffix'];
+        $opts['phone'] = ($opts['phone'] ?? null) ?: $parsed['phone'];
+
         if (! in_array($provider, (array) config('lottery.payments.providers', []), true)) {
             throw ValidationException::withMessages(['provider' => 'Unsupported payment provider.']);
         }
         if ($reference === '') {
-            throw ValidationException::withMessages(['reference' => 'Enter the transaction reference.']);
+            throw ValidationException::withMessages(['reference' => 'Enter the transaction number or paste your payment SMS.']);
         }
 
         // A reference can only ever be credited once.
@@ -73,12 +86,16 @@ final class DepositService
             throw ValidationException::withMessages(['reference' => 'This reference has already been used.']);
         }
 
-        $this->notifier->send(
-            $player->telegram_id,
-            "✅ <b>Deposit confirmed!</b>\n+{$amount} ".config('lottery.currency').
-            "\n💼 New balance: ".number_format((float) $player->fresh()->balance, 2).' '.config('lottery.currency'),
-            'deposit',
-        );
+        // The DM deposit flow replies synchronously, so it opts out of the
+        // queued confirmation to avoid a duplicate message.
+        if ($notify) {
+            $this->notifier->send(
+                $player->telegram_id,
+                "✅ <b>Deposit confirmed!</b>\n+{$amount} ".config('lottery.currency').
+                "\n💼 New balance: ".number_format((float) $player->fresh()->balance, 2).' '.config('lottery.currency'),
+                'deposit',
+            );
+        }
 
         return $tx;
     }

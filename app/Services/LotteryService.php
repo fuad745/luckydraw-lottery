@@ -483,7 +483,7 @@ final class LotteryService
         return $owners->merge($coOwners)->filter()->unique()->values()->all();
     }
 
-    private function notifyPurchase(Round $round, Collection $tickets, int $buyerId): void
+    private function notifyPurchase(Round $round, Collection $tickets, int|string $buyerId): void
     {
         $parts = [];
         foreach ($tickets as $t) {
@@ -558,7 +558,7 @@ final class LotteryService
         );
     }
 
-    private function holderBestRank(Collection $winners, int $telegramId): int
+    private function holderBestRank(Collection $winners, int|string $telegramId): int
     {
         $best = PHP_INT_MAX;
         foreach ($winners as $t) {

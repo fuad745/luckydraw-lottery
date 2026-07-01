@@ -87,7 +87,7 @@ final class PurchaseTest extends TestCase
         $tickets = $svc->purchase($round, new PurchaseData(444, 'Owner Two', '+251944556677', picks: [$this->pick(4, true)]));
 
         $ticket = $tickets->first();
-        $this->assertSame(444, $ticket->co_owner_telegram_id);
+        $this->assertSame('444', $ticket->co_owner_telegram_id); // ids are cast to string (64-bit safe)
         $this->assertSame(1.0, $ticket->fractionSold());
         $this->assertEqualsCanonicalizing([333, 444], array_keys($ticket->holderShares()));
     }

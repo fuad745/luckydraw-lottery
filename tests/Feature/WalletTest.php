@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
+use App\Jobs\SendTelegramMessage;
 use App\Models\Player;
 use App\Services\DepositService;
 use App\Services\WithdrawalService;
@@ -42,6 +43,35 @@ final class WalletTest extends TestCase
         $this->assertSame(500.0, (float) $player->fresh()->balance);
         $this->assertSame(TransactionType::Deposit, $tx->type);
         $this->assertSame(500.0, (float) $tx->amount);
+    }
+
+    public function test_deposit_can_suppress_the_queued_confirmation(): void
+    {
+        // The DM deposit flow replies synchronously, so it credits with
+        // notify:false and must not also queue the confirmation message.
+        $player = Player::factory()->create(['balance' => 0]);
+        $this->fakeVerify(['success' => true, 'amount' => 150, 'receiverName' => 'LuckyDraw']);
+
+        $tx = app(DepositService::class)->deposit($player, 'telebirr', 'NODM1', notify: false);
+
+        $this->assertSame(150.0, (float) $tx->amount);
+        Queue::assertNotPushed(SendTelegramMessage::class);
+    }
+
+    public function test_deposit_extracts_reference_from_a_pasted_cbe_sms(): void
+    {
+        // A player pastes the whole CBE message; the FT reference is pulled out.
+        $player = Player::factory()->create(['balance' => 0]);
+        Http::fake(['*/verify' => Http::response(['success' => true, 'amount' => 400])]);
+
+        $sms = 'Dear Customer, ETB 400.00 transferred. Ref FT253089F68Z. '
+            .'https://apps.cbe.com.et:100/?id=FT253089F68Z12345678';
+        $tx = app(DepositService::class)->deposit($player, 'telebirr', $sms);
+
+        $this->assertSame(400.0, (float) $tx->amount);
+        // The pasted link is a CBE receipt, so the provider is auto-corrected.
+        $this->assertSame('cbe', $tx->provider);
+        $this->assertSame('FT253089F68Z', $tx->reference);
     }
 
     public function test_a_reference_cannot_be_used_twice(): void
