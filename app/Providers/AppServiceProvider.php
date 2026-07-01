@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\PaymentSettings;
 use App\Telegram\TelegramAuth;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Apply admin-editable payment overrides on top of config/.env.
+        $this->app->make(PaymentSettings::class)->apply();
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Admin;
 
 use App\Services\AdminCredentials;
+use App\Services\PaymentSettings;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -21,9 +22,55 @@ final class Settings extends Component
 
     public string $flash = '';
 
-    public function mount(AdminCredentials $credentials): void
+    // Payment settings
+    /** @var array<int,string> */
+    public array $providers = [];
+
+    public string $depositAccounts = '';
+
+    // Nullable so clearing the input doesn't 500 on a typed float; seeded in mount().
+    public ?float $minDeposit = null;
+
+    public ?float $minWithdraw = null;
+
+    public string $depositInstructions = '';
+
+    public string $payFlash = '';
+
+    public function mount(AdminCredentials $credentials, PaymentSettings $payments): void
     {
         $this->username = $credentials->username();
+
+        $snap = $payments->snapshot();
+        $this->providers = $snap['providers'];
+        $this->depositAccounts = $snap['deposit_accounts'];
+        $this->minDeposit = $snap['min_deposit'];
+        $this->minWithdraw = $snap['min_withdraw'];
+        $this->depositInstructions = $snap['deposit_instructions'];
+    }
+
+    public function savePayments(PaymentSettings $payments): void
+    {
+        $this->validate([
+            'providers' => ['required', 'array', 'min:1'],
+            'providers.*' => ['in:'.implode(',', PaymentSettings::SUPPORTED)],
+            'depositAccounts' => ['nullable', 'string', 'max:1000'],
+            'minDeposit' => ['required', 'numeric', 'min:0'],
+            'minWithdraw' => ['required', 'numeric', 'min:0'],
+            'depositInstructions' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'providers.required' => 'Enable at least one payment method.',
+        ]);
+
+        $payments->save(
+            $this->providers,
+            $this->depositAccounts,
+            (float) $this->minDeposit,
+            (float) $this->minWithdraw,
+            $this->depositInstructions,
+        );
+
+        $this->payFlash = 'Payment settings saved.';
     }
 
     public function save(AdminCredentials $credentials): void
@@ -51,6 +98,8 @@ final class Settings extends Component
 
     public function render()
     {
-        return view('livewire.admin.settings');
+        return view('livewire.admin.settings', [
+            'supportedProviders' => PaymentSettings::SUPPORTED,
+        ]);
     }
 }
