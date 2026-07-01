@@ -60,8 +60,9 @@
             <p class="mt-1 text-[11px] text-slate-500">{{ __('Tip: copy the whole confirmation message from :sender — we pull out the transaction number automatically.', ['sender' => '127 / CBE / M-PESA']) }}</p>
 
             @if ($provider === 'cbe')
-                <label class="label mt-3" for="dep-suffix">{{ __('Account suffix (last digits) — optional') }}</label>
-                <input id="dep-suffix" type="text" wire:model="suffix" class="input" placeholder="{{ __('Auto-filled from your SMS if present') }}">
+                <label class="label mt-3" for="dep-cbe-account">{{ __('Your CBE account number') }}</label>
+                <input id="dep-cbe-account" type="text" inputmode="numeric" wire:model="cbeAccount" class="input" placeholder="{{ __('e.g. 1000230846522') }}">
+                <p class="mt-1 text-[11px] text-slate-500">{{ __('The account you paid from — we use it to find your CBE receipt. (Skip if you pasted your full CBE SMS above.)') }}</p>
             @elseif (in_array($provider, ['cbebirr', 'mpesa']))
                 <label class="label mt-3" for="dep-phone">{{ __('Your phone number — optional') }}</label>
                 <input id="dep-phone" type="tel" wire:model="payerPhone" class="input" placeholder="{{ __('Auto-filled from your SMS if present') }}">

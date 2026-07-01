@@ -22,7 +22,7 @@ final class Wallet extends Component
 
     public string $reference = '';
 
-    public string $suffix = '';       // CBE account suffix
+    public string $cbeAccount = '';   // player's full CBE account number (we derive the suffix)
 
     public string $payerPhone = '';   // CBE Birr / M-Pesa
 
@@ -50,7 +50,7 @@ final class Wallet extends Component
 
         try {
             $tx = $deposits->deposit($player, $this->provider, $this->reference, [
-                'suffix' => $this->suffix ?: null,
+                'suffix' => $this->cbeAccount ?: null,
                 'phone' => $this->payerPhone ?: null,
             ]);
         } catch (ValidationException $e) {
@@ -59,7 +59,7 @@ final class Wallet extends Component
             return;
         }
 
-        $this->reset('reference', 'suffix', 'payerPhone');
+        $this->reset('reference', 'cbeAccount', 'payerPhone');
         $this->dispatch('haptic', type: 'notification', style: 'success');
         $this->dispatch('toast', message: __('Deposit confirmed: +:amount :currency', ['amount' => $tx->amount, 'currency' => config('lottery.currency')]), type: 'success');
     }

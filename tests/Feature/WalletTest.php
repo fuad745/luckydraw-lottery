@@ -74,6 +74,31 @@ final class WalletTest extends TestCase
         $this->assertSame('FT253089F68Z', $tx->reference);
     }
 
+    public function test_cbe_derives_the_8_digit_suffix_from_a_full_account_number(): void
+    {
+        // Players enter their full CBE account; we send only the last 8 digits
+        // (the receipt lookup suffix) to the verifier.
+        $player = Player::factory()->create(['balance' => 0]);
+        Http::fake(['*/verify' => Http::response(['success' => true, 'amount' => 300, 'receiverName' => 'LuckyDraw'])]);
+
+        app(DepositService::class)->deposit($player, 'cbe', 'FT25182ABCDX', ['suffix' => '1000230846522']);
+
+        Http::assertSent(fn ($request) => $request['suffix'] === '30846522');
+    }
+
+    public function test_cbe_without_an_account_number_asks_for_it(): void
+    {
+        $player = Player::factory()->create(['balance' => 0]);
+        Http::fake(['*/verify' => Http::response(['success' => true, 'amount' => 300])]);
+
+        try {
+            app(DepositService::class)->deposit($player, 'cbe', 'FT25182ABCDX');
+            $this->fail('Expected a validation error.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('CBE account number', collect($e->errors())->flatten()->first());
+        }
+    }
+
     public function test_a_reference_cannot_be_used_twice(): void
     {
         $player = Player::factory()->create(['balance' => 0]);

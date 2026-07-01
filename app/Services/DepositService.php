@@ -56,6 +56,20 @@ final class DepositService
             throw ValidationException::withMessages(['reference' => 'Enter the transaction number or paste your payment SMS.']);
         }
 
+        // CBE looks a receipt up by transaction reference + the last 8 digits of
+        // the paying account. Players give their full CBE account number (or paste
+        // the SMS) and we derive the 8-digit suffix — simpler and less error-prone
+        // than asking them to count digits themselves.
+        if ($provider === 'cbe') {
+            $digits = preg_replace('/\D+/', '', (string) ($opts['suffix'] ?? ''));
+            if (strlen((string) $digits) < 8) {
+                throw ValidationException::withMessages([
+                    'reference' => 'Enter your CBE account number (or paste your full CBE SMS) so we can find the receipt.',
+                ]);
+            }
+            $opts['suffix'] = substr((string) $digits, -8);
+        }
+
         // A deposit reference can only ever be credited once (matches the
         // unique(provider, deposit_reference) index below).
         if (Transaction::where('provider', $provider)->where('deposit_reference', $reference)->exists()) {
