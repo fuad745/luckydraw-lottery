@@ -22,7 +22,9 @@ final class Players extends Component
     // Balance-adjustment modal
     public ?int $editing = null;
 
-    public float $adjustAmount = 0;
+    // Nullable so clearing the field hydrates to null (a clean "required"
+    // validation error) instead of throwing a 500 on a typed float.
+    public ?float $adjustAmount = null;
 
     public string $adjustNote = '';
 
@@ -36,7 +38,7 @@ final class Players extends Component
     public function openAdjust(int $telegramId): void
     {
         $this->editing = $telegramId;
-        $this->adjustAmount = 0;
+        $this->adjustAmount = null;
         $this->adjustNote = '';
     }
 

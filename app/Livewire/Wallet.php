@@ -26,8 +26,9 @@ final class Wallet extends Component
 
     public string $payerPhone = '';   // CBE Birr / M-Pesa
 
-    // Withdraw form
-    public float $amount = 0;
+    // Withdraw form. Nullable so clearing the input hydrates to null instead of
+    // throwing a 500 on a typed float; withdraw() casts and the service validates.
+    public ?float $amount = null;
 
     public string $payoutProvider = 'telebirr';
 

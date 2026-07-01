@@ -21,17 +21,21 @@ final class Rounds extends Component
     #[Validate('required|string|min:3|max:80')]
     public string $title = '';
 
+    // Numeric inputs are nullable (so clearing the field hydrates to null
+    // instead of throwing a 500 on a typed int) and default to null (so an empty
+    // submit stays null and trips `required`, rather than snapping back to a
+    // non-null PHP default). The real defaults are seeded in mount().
     #[Validate('required|integer|min:2|max:1000')]
-    public int $totalTickets = 50;
+    public ?int $totalTickets = null;
 
     #[Validate('required|numeric|min:1')]
-    public float $ticketPrice = 50;
+    public ?float $ticketPrice = null;
 
     #[Validate('required|string|max:8')]
     public string $currency = 'ETB';
 
     #[Validate('required|integer|min:1|max:5')]
-    public int $winnersCount = 1;
+    public ?int $winnersCount = 1;
 
     /** @var array<int,array{type:string,value:float}> */
     public array $tiers = [];
@@ -42,8 +46,8 @@ final class Rounds extends Component
 
     public bool $autoRestart = false;
 
-    #[Validate('integer|min:1|max:1440')]
-    public int $restartDelay = 5;
+    #[Validate('nullable|integer|min:1|max:1440')]
+    public ?int $restartDelay = 5;
 
     public string $channelId = '';
 
@@ -53,6 +57,8 @@ final class Rounds extends Component
 
     public function mount(): void
     {
+        $this->totalTickets = 50;
+        $this->ticketPrice = 50;
         $this->currency = (string) config('lottery.currency', 'ETB');
         $this->channelId = (string) config('lottery.channel_id', '');
         $this->syncTiers();
@@ -60,15 +66,16 @@ final class Rounds extends Component
 
     public function updatedWinnersCount(): void
     {
-        $this->winnersCount = max(1, min(5, $this->winnersCount));
+        $this->winnersCount = max(1, min(5, (int) $this->winnersCount));
         $this->syncTiers();
     }
 
     private function syncTiers(): void
     {
-        $defaults = PrizeCalculator::defaultStructure($this->winnersCount);
+        $count = max(1, min(5, (int) $this->winnersCount));
+        $defaults = PrizeCalculator::defaultStructure($count);
         $tiers = [];
-        for ($i = 0; $i < $this->winnersCount; $i++) {
+        for ($i = 0; $i < $count; $i++) {
             $existing = $this->tiers[$i] ?? null;
             $default = $defaults[$i] ?? ['type' => 'percent', 'value' => 0];
             $tiers[] = [
@@ -131,8 +138,11 @@ final class Rounds extends Component
 
     public function render(PrizeCalculator $calculator)
     {
-        $pot = round($this->totalTickets * $this->ticketPrice, 2);
-        $preview = $calculator->distribute($pot, $this->ticketPrice, $this->prizeStructure());
+        // Cast defensively — any of these may be transiently null while the
+        // operator is mid-edit (a cleared input).
+        $price = (float) $this->ticketPrice;
+        $pot = round(((int) $this->totalTickets) * $price, 2);
+        $preview = $calculator->distribute($pot, $price, $this->prizeStructure());
 
         $recent = Round::latest('id')->limit(12)->get();
 
