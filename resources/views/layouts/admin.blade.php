@@ -18,6 +18,7 @@
             ['admin.withdrawals', 'withdrawals', 'Withdrawals'],
             ['admin.transactions', 'transactions', 'Transactions'],
             ['admin.broadcast', 'broadcast', 'Broadcast'],
+            ['admin.settings', 'settings', 'Settings'],
         ];
         $pendingWithdrawals = \App\Models\Transaction::where('type', 'withdrawal')->where('status', 'pending')->count();
     @endphp

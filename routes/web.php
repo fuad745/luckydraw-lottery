@@ -7,6 +7,7 @@ use App\Livewire\Admin\Broadcast;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Players;
 use App\Livewire\Admin\Rounds;
+use App\Livewire\Admin\Settings as AdminSettings;
 use App\Livewire\Admin\Transactions;
 use App\Livewire\Admin\Withdrawals;
 use App\Livewire\History;
@@ -55,6 +56,7 @@ Route::prefix('admin')->group(function (): void {
         Route::get('transactions', Transactions::class)->name('admin.transactions');
         Route::get('transactions/export', TransactionExportController::class)->name('admin.transactions.export');
         Route::get('broadcast', Broadcast::class)->name('admin.broadcast');
+        Route::get('settings', AdminSettings::class)->name('admin.settings');
     });
 });
 

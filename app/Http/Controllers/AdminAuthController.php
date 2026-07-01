@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Services\AdminCredentials;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
@@ -36,7 +36,7 @@ final class AdminAuthController extends Controller
             return back()->withErrors(['username' => "Too many attempts. Try again in {$seconds}s."]);
         }
 
-        if (! $this->validCredentials($credentials['username'], $credentials['password'])) {
+        if (! app(AdminCredentials::class)->matches($credentials['username'], $credentials['password'])) {
             RateLimiter::hit($key, 60);
 
             return back()->withErrors(['username' => 'Invalid username or password.'])->onlyInput('username');
@@ -55,19 +55,5 @@ final class AdminAuthController extends Controller
         $request->session()->regenerate();
 
         return redirect()->route('admin.login');
-    }
-
-    private function validCredentials(string $username, string $password): bool
-    {
-        $expectedUser = (string) config('lottery.admin_panel.username');
-        $hash = config('lottery.admin_panel.password_hash');
-
-        // Both checks always run (no short-circuit) before combining.
-        $userOk = hash_equals($expectedUser, $username);
-        $passOk = ! empty($hash)
-            ? Hash::check($password, (string) $hash)                                  // preferred: bcrypt
-            : hash_equals((string) config('lottery.admin_panel.password'), $password); // fallback: constant-time plaintext
-
-        return $userOk && $passOk;
     }
 }
