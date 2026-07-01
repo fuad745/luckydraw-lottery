@@ -55,16 +55,26 @@ final class PaymentVerifier
         // not report an explicit failure/pending state, and a real amount landed.
         // (The previous `!== false` check failed open on null/absent flags.)
         $flag = $data['success'] ?? $data['ok'] ?? null;
-        $flagOk = $flag === null ? true : filter_var($flag, FILTER_VALIDATE_BOOLEAN);
+        $hasFlag = $flag !== null;
+        $flagOk = ! $hasFlag || filter_var($flag, FILTER_VALIDATE_BOOLEAN);
 
         $state = strtolower((string) ($this->dig($data, ['status', 'transactionStatus', 'state', 'result']) ?? ''));
-        $stateOk = $state === '' || in_array(
+        $hasState = $state !== '';
+        $stateOk = ! $hasState || in_array(
             $state,
             ['success', 'successful', 'completed', 'complete', 'paid', 'settled', 'confirmed', 'done', 'ok'],
             true,
         );
 
-        $success = $res->successful() && $flagOk && $stateOk && $this->extractAmount($data) > 0;
+        // Don't fail open on a bare {amount} echo: require at least one positive
+        // signal that this is a real, settled transaction — an explicit truthy
+        // flag/state, or a parsed payer/receiver identity (present on genuine
+        // receipts, absent from an error body that merely echoes a number).
+        $hasIdentity = ! empty($this->dig($data, ['senderName', 'payerName', 'payer', 'debitedPartyName']))
+            || ! empty($this->dig($data, ['receiverName', 'creditedPartyName', 'receiver', 'creditedParty']));
+        $positive = ($hasFlag && $flagOk) || ($hasState && $stateOk) || $hasIdentity;
+
+        $success = $res->successful() && $flagOk && $stateOk && $positive && $this->extractAmount($data) > 0;
 
         if (! $success) {
             return $fail($data['message'] ?? $data['error'] ?? 'We could not verify that reference. Double-check it.');

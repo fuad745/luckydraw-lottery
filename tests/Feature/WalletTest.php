@@ -104,6 +104,29 @@ final class WalletTest extends TestCase
         app(DepositService::class)->deposit($player, 'telebirr', 'WRONG');
     }
 
+    public function test_a_bare_amount_response_without_any_success_signal_is_rejected(): void
+    {
+        // Fail-closed: a 200 that merely echoes an amount (no success flag, no
+        // status, no payer/receiver identity) must not be trusted.
+        $player = Player::factory()->create(['balance' => 0]);
+        $this->fakeVerify(['amount' => 500]);
+
+        $this->expectException(ValidationException::class);
+        app(DepositService::class)->deposit($player, 'telebirr', 'BAREAMT');
+    }
+
+    public function test_a_response_with_payer_receiver_identity_is_accepted(): void
+    {
+        // A genuine parsed receipt carries payer/receiver even if no explicit
+        // success flag is present.
+        $player = Player::factory()->create(['balance' => 0]);
+        $this->fakeVerify(['amount' => 500, 'payerName' => 'Abebe', 'receiverName' => 'LuckyDraw']);
+
+        $tx = app(DepositService::class)->deposit($player, 'telebirr', 'IDENTITY1');
+
+        $this->assertSame(500.0, (float) $tx->amount);
+    }
+
     public function test_a_pending_or_failed_transaction_status_is_rejected(): void
     {
         $player = Player::factory()->create(['balance' => 0]);
