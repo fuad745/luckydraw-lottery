@@ -56,8 +56,9 @@ final class DepositService
             throw ValidationException::withMessages(['reference' => 'Enter the transaction number or paste your payment SMS.']);
         }
 
-        // A reference can only ever be credited once.
-        if (Transaction::where('provider', $provider)->where('reference', $reference)->exists()) {
+        // A deposit reference can only ever be credited once (matches the
+        // unique(provider, deposit_reference) index below).
+        if (Transaction::where('provider', $provider)->where('deposit_reference', $reference)->exists()) {
             throw ValidationException::withMessages(['reference' => 'This reference has already been used.']);
         }
 
@@ -105,12 +106,15 @@ final class DepositService
     {
         $accounts = array_filter((array) config('lottery.payments.deposit_accounts', []));
         if ($accounts === []) {
-            // Not configured — any verified payment is credited regardless of payee.
-            // Acceptable in dev, but a real fail-open risk in production: surface it.
+            // Without configured receiving accounts we cannot prove a payment was
+            // made to *us*, so any genuine third-party receipt would be credited.
+            // Fail CLOSED in production (set DEPOSIT_ACCOUNTS to enable deposits);
+            // stay open in local/dev so the flow is testable without real accounts.
             if (app()->environment('production')) {
-                Log::warning('Deposit credited without a receiver check — set DEPOSIT_ACCOUNTS to enforce "paid to us".', [
-                    'receiver' => $result['receiver'] ?? null,
-                    'receiverAccount' => $result['receiverAccount'] ?? null,
+                Log::error('Deposit blocked: DEPOSIT_ACCOUNTS is not configured, so "paid to us" cannot be verified.');
+
+                throw ValidationException::withMessages([
+                    'reference' => 'Deposits are temporarily unavailable. Please contact support.',
                 ]);
             }
 

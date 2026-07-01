@@ -37,7 +37,7 @@ final class TransactionExportController extends Controller
 
             $query->latest('id')->chunk(500, function ($rows) use ($out): void {
                 foreach ($rows as $t) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map($this->csvSafe(...), [
                         $t->id,
                         $t->telegram_id,
                         $t->player?->name,
@@ -49,11 +49,25 @@ final class TransactionExportController extends Controller
                         $t->reference,
                         $t->round_id,
                         $t->created_at?->toIso8601String(),
-                    ]);
+                    ]));
                 }
             });
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Neutralise CSV formula injection: a spreadsheet treats a cell starting
+     * with = + - @ (or a leading tab/CR) as a formula. Player names and payment
+     * references are user-controlled, so prefix such values with a single quote.
+     */
+    private function csvSafe(int|string|null $value): int|string|null
+    {
+        if (is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }

@@ -13,6 +13,7 @@ use App\Models\Player;
 use App\Models\Round;
 use App\Models\Ticket;
 use App\Models\Transaction;
+use App\Support\Html;
 use App\Support\Money;
 use App\Telegram\MiniApp;
 use Illuminate\Support\Collection;
@@ -58,7 +59,8 @@ final class LotteryService
 
     private function announceNewRound(Round $round): void
     {
-        $msg = "🎉 <b>New round is live: {$round->title}!</b>\n".
+        $title = Html::tg($round->title);
+        $msg = "🎉 <b>New round is live: {$title}!</b>\n".
             "🎟 {$round->total_tickets} tickets · {$round->ticket_price} {$round->currency} each\n".
             "🏆 {$round->winners_count} winner(s)\n".
             'Open the app and grab your lucky numbers! 🍀';
@@ -147,11 +149,10 @@ final class LotteryService
         }
 
         $previousTicketCount = (int) $buyer->total_tickets_bought;
-        $cost = $this->purchaseCost($picks, (float) $round->ticket_price);
 
         try {
             /** @var array{tickets: Collection<int,Ticket>, filledHalves: array<int,Ticket>} $result */
-            $result = DB::transaction(function () use ($round, $data, $buyer, $picks, $cost): array {
+            $result = DB::transaction(function () use ($round, $data, $buyer, $picks): array {
                 $round = Round::whereKey($round->getKey())->lockForUpdate()->first();
 
                 if (! $round || $round->status !== RoundStatus::Open) {
@@ -213,6 +214,11 @@ final class LotteryService
 
                 $buyer->increment('total_tickets_bought', count($picks));
 
+                // Charge for the stake actually delivered, not the raw request: a
+                // full pick that could only fill an open half costs a half, never
+                // the full price. (Fixes a 2× overcharge on open-half numbers.)
+                $cost = round($this->deliveredUnits($created, $filledHalves) * (float) $round->ticket_price, 2);
+
                 // Pay for the tickets from the wallet (balance-checked, atomic).
                 $numbers = $created->pluck('ticket_number')->sort()->map(fn ($n) => "#{$n}")->implode(', ');
                 $this->wallet->debit($data->buyerTelegramId, $cost, TransactionType::Purchase, [
@@ -236,15 +242,25 @@ final class LotteryService
         return $result['tickets'];
     }
 
-    /** Total cost of a set of board picks (full = 1.0, half = 0.5 of price). */
-    private function purchaseCost(array $picks, float $price): float
+    /**
+     * Ticket-price units the buyer actually received: a filled second half or a
+     * newly-opened first half is 0.5; a whole ticket is 1.0.
+     *
+     * @param  Collection<int,Ticket>  $created
+     * @param  array<int,Ticket>  $filledHalves
+     */
+    private function deliveredUnits($created, array $filledHalves): float
     {
         $units = 0.0;
-        foreach ($picks as $pick) {
-            $units += ! empty($pick['half']) ? 0.5 : 1.0;
+        foreach ($created as $ticket) {
+            if (in_array($ticket, $filledHalves, true) || $ticket->is_split) {
+                $units += 0.5; // bought one half (either the second, or a new first)
+            } else {
+                $units += 1.0; // bought a whole ticket
+            }
         }
 
-        return round($units * $price, 2);
+        return $units;
     }
 
     public function maybeTriggerDraw(Round $round): void
@@ -282,16 +298,17 @@ final class LotteryService
 
         $round->setAttribute('status', RoundStatus::Drawing);
 
+        $title = Html::tg($round->title);
         $this->notifier->broadcast(
             $this->roundHolderIds($round),
-            "🔔 <b>{$round->title}</b>\nSales are closed — the draw is starting NOW 🎰\nOpen the app to watch the balls roll!",
+            "🔔 <b>{$title}</b>\nSales are closed — the draw is starting NOW 🎰\nOpen the app to watch the balls roll!",
             'draw_starting',
             $round->id,
             MiniApp::webAppButton('👀 Watch live'),
         );
         $this->notifier->toChannel(
             $round->channelId(),
-            "🎰 <b>{$round->title}</b> — the draw is starting now! Winners announced in moments…",
+            "🎰 <b>{$title}</b> — the draw is starting now! Winners announced in moments…",
             'draw_starting',
             $round->id,
             MiniApp::chatLinkButton('👀 Watch live'),
@@ -373,9 +390,17 @@ final class LotteryService
                 'drawn_at' => now(),
             ]);
 
-            // Credit a win to every distinct holder of any winning ticket.
-            $holderIds = $winners->flatMap(fn (Ticket $t) => array_keys($t->holderShares()))->unique()->values()->all();
-            Player::whereIn('telegram_id', $holderIds)->increment('total_wins');
+            // Credit one win per winning ticket a holder is on (a player who owns
+            // two winning tickets counts as two wins, not one).
+            $winCounts = [];
+            foreach ($winners as $t) {
+                foreach (array_keys($t->holderShares()) as $tid) {
+                    $winCounts[$tid] = ($winCounts[$tid] ?? 0) + 1;
+                }
+            }
+            foreach ($winCounts as $tid => $count) {
+                Player::whereKey($tid)->increment('total_wins', $count);
+            }
 
             // Credit each holder's actual payout to their lifetime stat AND wallet.
             $perHolder = [];
@@ -429,9 +454,9 @@ final class LotteryService
         // Refund every wallet that paid into this round.
         $this->refundRound($round);
 
-        $msg = "⚠️ <b>{$round->title}</b> has been cancelled.";
+        $msg = '⚠️ <b>'.Html::tg($round->title).'</b> has been cancelled.';
         if ($reason) {
-            $msg .= "\n{$reason}";
+            $msg .= "\n".Html::tg($reason);
         }
         $msg .= "\nAll ticket payments have been refunded to your wallet balance.";
 
@@ -500,9 +525,10 @@ final class LotteryService
         $list = implode(', ', $parts);
         $units = number_format(array_reduce($tickets->all(), fn ($c, $t) => $c + (($t->is_split && ($t->co_owner_telegram_id === $buyerId || $t->co_owner_telegram_id === null)) ? 0.5 : 1), 0), 1);
 
+        $title = Html::tg($round->title);
         $this->notifier->send(
             $buyerId,
-            "✅ <b>Purchase confirmed!</b>\nYou got <b>{$list}</b> in <b>{$round->title}</b>.\n\n🎟 Stake: {$units} ticket(s)\n💰 Prize pool now: {$round->prizePool()} {$round->currency}\n\nGood luck! We'll DM you the moment you win.",
+            "✅ <b>Purchase confirmed!</b>\nYou got <b>{$list}</b> in <b>{$title}</b>.\n\n🎟 Stake: {$units} ticket(s)\n💰 Prize pool now: {$round->prizePool()} {$round->currency}\n\nGood luck! We'll DM you the moment you win.",
             'ticket_purchased',
             $round->id,
         );
@@ -511,10 +537,12 @@ final class LotteryService
     /** Tell the original half-owner that their number is now fully shared. */
     private function notifyHalvesCompleted(Round $round, array $filledHalves, string $buyerName): void
     {
+        $buyer = Html::tg($buyerName);
+        $title = Html::tg($round->title);
         foreach ($filledHalves as $t) {
             $this->notifier->send(
                 (int) $t->owner_telegram_id,
-                "🤝 <b>Your ticket #{$t->ticket_number} is now fully shared!</b>\n{$buyerName} bought the other half in <b>{$round->title}</b>. If it wins, you each take 50% of that ticket's prize.",
+                "🤝 <b>Your ticket #{$t->ticket_number} is now fully shared!</b>\n{$buyer} bought the other half in <b>{$title}</b>. If it wins, you each take 50% of that ticket's prize.",
                 'half_completed',
                 $round->id,
             );
@@ -523,8 +551,10 @@ final class LotteryService
 
     private function announceResult(Round $round, Collection $winners, array $perHolder): void
     {
+        $title = Html::tg($round->title);
+
         if ($winners->isEmpty()) {
-            $this->notifier->toChannel($round->channelId(), "⚠️ <b>{$round->title}</b> ended with no valid tickets.", 'draw_void', $round->id);
+            $this->notifier->toChannel($round->channelId(), "⚠️ <b>{$title}</b> ended with no valid tickets.", 'draw_void', $round->id);
 
             return;
         }
@@ -539,7 +569,7 @@ final class LotteryService
             $medal = ['1' => '🥇', '2' => '🥈', '3' => '🥉'][(string) $rank] ?? '🏅';
             $this->notifier->send(
                 (int) $tid,
-                "🎉 <b>YOU WON!</b> {$medal}\nYou placed <b>#{$rank}</b> in <b>{$round->title}</b>.\n💰 Your prize: <b>{$amount} {$round->currency}</b>\n\nThe organiser will arrange your payout. Congratulations! 🥳",
+                "🎉 <b>YOU WON!</b> {$medal}\nYou placed <b>#{$rank}</b> in <b>{$title}</b>.\n💰 Your prize: <b>{$amount} {$round->currency}</b>\n\nThe organiser will arrange your payout. Congratulations! 🥳",
                 'win',
                 $round->id,
                 MiniApp::webAppButton('👛 Open Wallet', 'wallet'),
@@ -549,14 +579,14 @@ final class LotteryService
         // 2) Public results to the channel.
         $lines = $winners->map(function (Ticket $t) use ($round) {
             $medal = ['1' => '🥇', '2' => '🥈', '3' => '🥉'][(string) $t->win_rank] ?? '🏅';
-            $who = $t->is_split ? $t->ownershipLabel() : $t->owner_name;
+            $who = Html::tg($t->is_split ? $t->ownershipLabel() : $t->owner_name);
 
             return "{$medal} #{$t->win_rank} — Ticket <b>#{$t->ticket_number}</b> ({$who}) → <b>{$t->prize_amount} {$round->currency}</b>";
         })->implode("\n");
 
         $this->notifier->toChannel(
             $round->channelId(),
-            "🎰🏆 <b>{$round->title} — RESULTS</b>\n\n{$lines}\n\n💰 Prize pool: {$round->prizePool()} {$round->currency}\nCongratulations to the winners! 🎉",
+            "🎰🏆 <b>{$title} — RESULTS</b>\n\n{$lines}\n\n💰 Prize pool: {$round->prizePool()} {$round->currency}\nCongratulations to the winners! 🎉",
             'draw_result',
             $round->id,
             MiniApp::chatLinkButton('🎟 Join the next round'),

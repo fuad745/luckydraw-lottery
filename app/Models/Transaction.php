@@ -22,6 +22,7 @@ final class Transaction extends Model
         'balance_after',
         'provider',
         'reference',
+        'deposit_reference',
         'round_id',
         'note',
         'meta',

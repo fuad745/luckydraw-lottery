@@ -126,6 +126,20 @@ final class PaymentMessageParser
     }
 
     /**
+     * A quick "is this even a payment message?" gate for the deposit-by-DM flow,
+     * so casual chat that merely contains an FT-like token doesn't trigger a
+     * verification call. True when a receipt link, a provider name, or a
+     * currency/amount is present.
+     */
+    public function looksLikePayment(string $text): bool
+    {
+        return (bool) preg_match(
+            '#https?://|telebirr|m[\s\-]?pesa|\bcbe\b|cbe[\s\-]?birr|abyssinia|dashen|\bETB\b|\bbirr\b|\d[\d,]*\.\d{2}#i',
+            $text,
+        );
+    }
+
+    /**
      * Split a CBE receipt id into its FT reference and the trailing account
      * suffix (the last 8 digits of the sender's account CBE appends to the id).
      *

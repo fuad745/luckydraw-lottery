@@ -8,6 +8,7 @@ use App\Models\Round;
 use App\Services\DepositService;
 use App\Services\PaymentMessageParser;
 use App\Services\PlayerService;
+use App\Support\Html;
 use App\Support\Phone;
 use App\Telegram\MiniApp;
 use Illuminate\Validation\ValidationException;
@@ -50,7 +51,7 @@ $startHandler = static function (Nutgram $bot, ?string $payload = null) use ($pl
     $me = $player($bot, $ref);
 
     $bot->sendMessage(
-        text: "🎰 <b>Welcome to LuckyDraw, {$me->name}!</b>\n\n".
+        text: '🎰 <b>Welcome to LuckyDraw, '.Html::tg($me->name)."!</b>\n\n".
             "Buy tickets, pick your lucky number, split tickets with friends, and win the prize pool when the draw happens.\n\n".
             "Tap the button below to open the game 👇\n\n".
             "<i>Your referral link:</i>\n".$me->referralLink((string) config('lottery.bot_username')),
@@ -107,7 +108,7 @@ $bot->onCommand('mytickets', function (Nutgram $bot) use ($player): void {
         $split = $t->is_split ? ' 🤝' : '';
         $win = $t->is_winner ? ' 🏆' : '';
 
-        return "• <b>#{$t->ticket_number}</b> — {$t->round->title}{$split}{$win}";
+        return '• <b>#'.$t->ticket_number.'</b> — '.Html::tg($t->round->title).$split.$win;
     })->implode("\n");
 
     $bot->sendMessage(
@@ -165,11 +166,11 @@ $bot->onCommand('results', function (Nutgram $bot): void {
         $medal = ['🥇', '🥈', '🥉'][($w->win_rank ?? 1) - 1] ?? '🏅';
         $who = $w->is_split ? $w->ownershipLabel() : $w->owner_name;
 
-        return "{$medal} #{$w->win_rank} — Ticket <b>#{$w->ticket_number}</b> (".e($who).") → <b>{$w->prize_amount} {$round->currency}</b>";
+        return "{$medal} #{$w->win_rank} — Ticket <b>#{$w->ticket_number}</b> (".Html::tg($who).") → <b>{$w->prize_amount} {$round->currency}</b>";
     })->implode("\n");
 
     $bot->sendMessage(
-        text: "🏆 <b>Latest results — {$round->title}</b>\n\n{$lines}\n\nPrize pool: <b>{$round->prizePool()} {$round->currency}</b>",
+        text: '🏆 <b>Latest results — '.Html::tg($round->title)."</b>\n\n{$lines}\n\nPrize pool: <b>{$round->prizePool()} {$round->currency}</b>",
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('📜 View history', 'history'),
     );
@@ -232,7 +233,7 @@ $bot->onCommand('admin', function (Nutgram $bot) use ($isAdmin): void {
 
     $round = Round::current();
     $stats = $round
-        ? "📊 <b>{$round->title}</b>\nStatus: {$round->status->label()}\nSold: {$round->ticketsSold()}/{$round->total_tickets}\nPrize pool: {$round->prizePool()} {$round->currency}"
+        ? '📊 <b>'.Html::tg($round->title)."</b>\nStatus: ".$round->status->label()."\nSold: {$round->ticketsSold()}/{$round->total_tickets}\nPrize pool: {$round->prizePool()} {$round->currency}"
         : 'No active round.';
 
     // The operator panel is browser-only (password protected) — not a Mini App.
@@ -272,7 +273,7 @@ $bot->onContact(function (Nutgram $bot) use ($player): void {
     $me->update(['phone' => $phone]);
 
     $bot->sendMessage(
-        text: "✅ <b>Thanks, {$me->name}!</b>\nYour contact is saved — you're all set. Tap below to play 👇",
+        text: '✅ <b>Thanks, '.Html::tg($me->name)."!</b>\nYour contact is saved — you're all set. Tap below to play 👇",
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
     );
@@ -290,6 +291,16 @@ $tryDeposit = static function (Nutgram $bot, string $text) use ($player): bool {
     // codes are left to the Mini App, where the method is chosen explicitly.
     $parsed = app(PaymentMessageParser::class)->parse($text);
     if ($parsed['provider'] === null || $parsed['reference'] === null) {
+        return false;
+    }
+
+    // Only spend a verification call on something that actually looks like a
+    // payment: a bare reference token, or a message with a receipt link /
+    // provider keyword / amount. Avoids firing on casual chatter that merely
+    // contains an FT-like token.
+    $trimmed = trim($text);
+    $isBareToken = ! preg_match('/\s/', $trimmed) && mb_strlen($trimmed) <= 40;
+    if (! $isBareToken && ! app(PaymentMessageParser::class)->looksLikePayment($text)) {
         return false;
     }
 
@@ -344,4 +355,21 @@ $bot->fallback(function (Nutgram $bot) use ($tryDeposit): void {
         parse_mode: ParseMode::HTML,
         reply_markup: MiniApp::button('🎟 Open LuckyDraw'),
     );
+});
+
+/*
+| Global safety net: a handler that throws must not 500 the webhook, or Telegram
+| re-delivers the same update in a loop (and may disable the webhook). Log it and
+| return 200; reply generically in private chats.
+*/
+$bot->onException(function (Nutgram $bot, Throwable $e): void {
+    report($e);
+
+    try {
+        if ($bot->chat()?->isPrivate()) {
+            $bot->sendMessage(text: '⚠️ Something went wrong. Please try again in a moment.');
+        }
+    } catch (Throwable) {
+        // Never let the error handler itself throw.
+    }
 });

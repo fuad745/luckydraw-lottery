@@ -160,4 +160,35 @@ final class WalletTest extends TestCase
         $this->expectException(ValidationException::class);
         app(WithdrawalService::class)->request($player, 60, 'telebirr', '+251911000000');
     }
+
+    public function test_repeat_withdrawals_to_the_same_account_are_allowed(): void
+    {
+        // Regression: the unique(provider,reference) index used to crash the
+        // second payout to the same account.
+        $player = Player::factory()->create(['balance' => 500]);
+        $service = app(WithdrawalService::class);
+
+        $service->request($player, 100, 'telebirr', '0912345678');
+        $service->request($player->fresh(), 100, 'telebirr', '0912345678');
+
+        $this->assertSame(300.0, (float) $player->fresh()->balance);
+        $this->assertSame(2, $player->transactions()->where('type', 'withdrawal')->count());
+    }
+
+    public function test_deposit_fails_closed_in_production_without_configured_accounts(): void
+    {
+        $this->app['env'] = 'production';
+        config(['lottery.payments.deposit_accounts' => []]);
+        $player = Player::factory()->create(['balance' => 0]);
+        $this->fakeVerify(['success' => true, 'amount' => 500, 'receiverName' => 'Someone Else']);
+
+        try {
+            app(DepositService::class)->deposit($player, 'telebirr', 'PRODREF1');
+            $this->fail('Expected the deposit to be rejected.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('temporarily unavailable', collect($e->errors())->flatten()->first());
+        }
+
+        $this->assertSame(0.0, (float) $player->fresh()->balance);
+    }
 }

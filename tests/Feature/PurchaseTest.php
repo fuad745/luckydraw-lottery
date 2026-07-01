@@ -36,6 +36,24 @@ final class PurchaseTest extends TestCase
         return ['number' => $n, 'half' => $half];
     }
 
+    public function test_full_pick_on_an_open_half_is_charged_as_a_half(): void
+    {
+        // Regression: buying a full on a number that only has an open half used
+        // to charge full price (2x) while delivering only a half stake.
+        Queue::fake();
+        $round = $this->openRound();       // price 50
+        $this->fundedPlayer(111, 1000);
+        $this->fundedPlayer(222, 1000);
+
+        // A opens a half of #5.
+        app(LotteryService::class)->purchase($round, new PurchaseData(111, 'A', null, null, [$this->pick(5, true)]));
+        // B picks #5 as a FULL, but only the second half is available.
+        app(LotteryService::class)->purchase($round, new PurchaseData(222, 'B', null, null, [$this->pick(5, false)]));
+
+        // B pays for the half actually received (25), not the full 50.
+        $this->assertSame(975.0, (float) Player::whereKey(222)->value('balance'));
+    }
+
     public function test_it_buys_full_tickets_chosen_on_the_board(): void
     {
         Queue::fake();

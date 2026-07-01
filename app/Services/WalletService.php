@@ -64,6 +64,10 @@ final class WalletService
                 'balance_after' => $player->balance,
                 'provider' => $attrs['provider'] ?? null,
                 'reference' => $attrs['reference'] ?? null,
+                // Only deposits enforce a unique reference; other types (esp.
+                // withdrawals, whose reference is the payout account) leave this
+                // null so they never collide on the unique index.
+                'deposit_reference' => $type === TransactionType::Deposit ? ($attrs['reference'] ?? null) : null,
                 'round_id' => $attrs['round_id'] ?? null,
                 'note' => $attrs['note'] ?? null,
                 'meta' => $attrs['meta'] ?? null,

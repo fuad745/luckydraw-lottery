@@ -16,6 +16,15 @@ final class Phone
             return null;
         }
 
+        // Normalise Ethiopian local forms to international so a payout number is
+        // never stored as e.g. "+0912…". 09…/07… (10 digits) and bare 9…/7…
+        // (9 digits) become 251….
+        if (strlen($digits) === 10 && $digits[0] === '0') {
+            $digits = '251'.substr($digits, 1);
+        } elseif (strlen($digits) === 9 && in_array($digits[0], ['9', '7'], true)) {
+            $digits = '251'.$digits;
+        }
+
         return '+'.$digits;
     }
 }

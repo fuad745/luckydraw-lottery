@@ -16,7 +16,9 @@ final class SendTelegramMessage implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    // A few extra attempts so transient 429 rate-limits (which re-release the
+    // job, consuming an attempt) don't drop a message before it gets through.
+    public int $tries = 6;
 
     public int $backoff = 10;
 
