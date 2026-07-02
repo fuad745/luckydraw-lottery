@@ -131,7 +131,8 @@ final class ConcurrencyTest extends TestCase
 
         $referrer->refresh();
         $this->assertSame(1, (int) $referrer->referral_count);
-        $this->assertSame(1, (int) $referrer->free_tickets);
+        // Invite counting only — the free-ticket reward was removed.
+        $this->assertSame(0, (int) $referrer->free_tickets);
     }
 
     public function test_self_referral_earns_no_reward(): void

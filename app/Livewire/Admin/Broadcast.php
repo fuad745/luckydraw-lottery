@@ -19,8 +19,6 @@ final class Broadcast extends Component
 
     public string $audience = 'all'; // all | with_balance | recent_buyers
 
-    public string $flash = '';
-
     private function recipients(): Collection
     {
         return match ($this->audience) {
@@ -37,7 +35,7 @@ final class Broadcast extends Component
         $ids = $this->recipients();
         $notifier->broadcast($ids, $this->message, 'broadcast');
 
-        $this->flash = 'Queued to '.$ids->count().' player(s). Delivery runs through the queue.';
+        $this->dispatch('toast', message: 'Queued to '.$ids->count().' player(s). Delivery runs through the queue.', type: 'success');
         $this->reset('message');
     }
 

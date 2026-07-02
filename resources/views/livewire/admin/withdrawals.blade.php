@@ -13,10 +13,6 @@
         </select>
     </div>
 
-    @if ($flash)
-        <div class="card mb-4 border-emerald-500/30 p-3 text-sm font-semibold text-emerald-300">{{ $flash }}</div>
-    @endif
-
     <div class="space-y-2">
         @forelse ($withdrawals as $w)
             <div class="card p-4">
@@ -30,8 +26,10 @@
                 </div>
                 @if ($w->status === TransactionStatus::Pending)
                     <div class="mt-3 grid grid-cols-2 gap-2 sm:max-w-xs">
-                        <button wire:click="approve({{ $w->id }})" wire:confirm="Confirm you have paid this out?" class="btn-gold py-2 text-xs">Mark paid</button>
-                        <button wire:click="reject({{ $w->id }})" wire:confirm="Reject and refund to wallet?" class="btn-ghost py-2 text-xs text-rose-300">Reject & refund</button>
+                        <button wire:click="approve({{ $w->id }})" wire:confirm="Confirm you have paid this out?"
+                                wire:loading.attr="disabled" wire:target="approve" class="btn-gold py-2 text-xs">Mark paid</button>
+                        <button wire:click="reject({{ $w->id }})" wire:confirm="Reject and refund to wallet?"
+                                wire:loading.attr="disabled" wire:target="reject" class="btn-ghost py-2 text-xs text-rose-300">Reject & refund</button>
                     </div>
                 @endif
             </div>

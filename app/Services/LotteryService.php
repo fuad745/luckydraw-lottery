@@ -464,6 +464,25 @@ final class LotteryService
         $this->notifier->toChannel($round->channelId(), $msg, 'round_cancelled', $round->id);
     }
 
+    /**
+     * Permanently remove a round that never took money. Only allowed when no
+     * tickets were sold and no transactions reference it — anything a player
+     * paid into must go through cancelRound() (refunds) instead.
+     */
+    public function deleteRound(Round $round): void
+    {
+        $hasTickets = $round->tickets()->exists();
+        $hasMoney = Transaction::where('round_id', $round->id)->exists();
+
+        if ($hasTickets || $hasMoney) {
+            throw ValidationException::withMessages([
+                'round' => ['This round has players or payments — use "Cancel & refund" instead of deleting.'],
+            ]);
+        }
+
+        $round->delete();
+    }
+
     /** Credit every buyer back the amount they spent on a (now cancelled) round. */
     private function refundRound(Round $round): void
     {

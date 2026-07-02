@@ -59,9 +59,6 @@ return [
     // Seconds of suspense between locking sales and revealing the winner.
     'draw_suspense_seconds' => (int) env('LOTTERY_DRAW_SUSPENSE', 10),
 
-    // Free tickets awarded to a referrer when a referred player first buys.
-    'referral_reward_tickets' => (int) env('LOTTERY_REFERRAL_REWARD', 1),
-
     // Max tickets a single buyer may purchase in one transaction.
     'max_tickets_per_purchase' => (int) env('LOTTERY_MAX_PER_PURCHASE', 20),
 
@@ -93,6 +90,11 @@ return [
 
         'min_deposit' => (float) env('LOTTERY_MIN_DEPOSIT', 10),
         'min_withdraw' => (float) env('LOTTERY_MIN_WITHDRAW', 50),
+
+        // Deposit accounts DISPLAYED to players (separate from the anti-fraud
+        // list above). Each entry: ['provider' => ..., 'name' => ..., 'number' => ...].
+        // Managed from the admin Settings page; this is only the empty default.
+        'deposit_account_list' => [],
 
         // Where players send deposits — shown as instructions in the app.
         'deposit_instructions' => env('LOTTERY_DEPOSIT_INSTRUCTIONS',

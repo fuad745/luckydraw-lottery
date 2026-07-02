@@ -101,12 +101,21 @@ final class Wallet extends Component
                 ->latest('id')->limit(5)->get()
             : collect();
 
+        $providers = (array) config('lottery.payments.providers', []);
+
+        // Operator's receiving accounts to display — only for enabled providers.
+        $depositTargets = array_values(array_filter(
+            (array) config('lottery.payments.deposit_account_list', []),
+            fn ($a): bool => is_array($a) && in_array($a['provider'] ?? '', $providers, true),
+        ));
+
         return view('livewire.wallet', [
             'player' => $player,
             'balance' => (float) ($player->balance ?? 0),
             'transactions' => $transactions,
             'withdrawals' => $withdrawals,
-            'providers' => (array) config('lottery.payments.providers', []),
+            'providers' => $providers,
+            'depositTargets' => $depositTargets,
             'currency' => config('lottery.currency', 'ETB'),
             'minDeposit' => (float) config('lottery.payments.min_deposit', 10),
             'minWithdraw' => (float) config('lottery.payments.min_withdraw', 50),

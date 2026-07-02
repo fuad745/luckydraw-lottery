@@ -20,8 +20,6 @@ final class Settings extends Component
 
     public string $new_password_confirmation = '';
 
-    public string $flash = '';
-
     // Payment settings
     /** @var array<int,string> */
     public array $providers = [];
@@ -35,7 +33,12 @@ final class Settings extends Component
 
     public string $depositInstructions = '';
 
-    public string $payFlash = '';
+    /**
+     * Deposit accounts shown to players, one row per account.
+     *
+     * @var array<int,array{provider:string,name:string,number:string}>
+     */
+    public array $accountList = [];
 
     public function mount(AdminCredentials $credentials, PaymentSettings $payments): void
     {
@@ -47,6 +50,23 @@ final class Settings extends Component
         $this->minDeposit = $snap['min_deposit'];
         $this->minWithdraw = $snap['min_withdraw'];
         $this->depositInstructions = $snap['deposit_instructions'];
+        $this->accountList = $snap['account_list'];
+    }
+
+    public function addAccountRow(): void
+    {
+        $this->accountList[] = [
+            'provider' => $this->providers[0] ?? PaymentSettings::SUPPORTED[0],
+            'name' => '',
+            'number' => '',
+        ];
+    }
+
+    public function removeAccountRow(int $index): void
+    {
+        unset($this->accountList[$index]);
+        $this->accountList = array_values($this->accountList);
+        $this->resetErrorBag('accountList');
     }
 
     public function savePayments(PaymentSettings $payments): void
@@ -58,8 +78,13 @@ final class Settings extends Component
             'minDeposit' => ['required', 'numeric', 'min:0'],
             'minWithdraw' => ['required', 'numeric', 'min:0'],
             'depositInstructions' => ['nullable', 'string', 'max:1000'],
+            'accountList' => ['array', 'max:12'],
+            'accountList.*.provider' => ['required', 'in:'.implode(',', PaymentSettings::SUPPORTED)],
+            'accountList.*.name' => ['nullable', 'string', 'max:80'],
+            'accountList.*.number' => ['required', 'string', 'max:64'],
         ], [
             'providers.required' => 'Enable at least one payment method.',
+            'accountList.*.number.required' => 'Account number is required (or remove the row).',
         ]);
 
         $payments->save(
@@ -68,9 +93,15 @@ final class Settings extends Component
             (float) $this->minDeposit,
             (float) $this->minWithdraw,
             $this->depositInstructions,
+            $this->accountList,
         );
 
-        $this->payFlash = 'Payment settings saved.';
+        // Re-apply + re-read so any normalisation (dropped rows, lowercased
+        // providers) is reflected back in the form immediately.
+        $payments->apply();
+        $this->accountList = $payments->snapshot()['account_list'];
+
+        $this->dispatch('toast', message: 'Payment settings saved.', type: 'success');
     }
 
     public function save(AdminCredentials $credentials): void
@@ -93,7 +124,7 @@ final class Settings extends Component
         $credentials->update($this->username, $changedPassword ? $this->new_password : null);
 
         $this->reset('current_password', 'new_password', 'new_password_confirmation');
-        $this->flash = $changedPassword ? 'Username and password updated.' : 'Username updated.';
+        $this->dispatch('toast', message: $changedPassword ? 'Username and password updated.' : 'Username updated.', type: 'success');
     }
 
     public function render()

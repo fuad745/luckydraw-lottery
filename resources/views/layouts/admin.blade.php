@@ -81,5 +81,36 @@
             {{ $slot }}
         </div>
     </main>
+
+    {{-- Global toast host: listens for Livewire `toast` events from any
+         component, plus a one-shot session flash (post-redirect feedback). --}}
+    <div x-data="{
+            toasts: [],
+            add(t) {
+                const id = ++this._id;
+                this.toasts.push({ id, message: t.message, type: t.type || 'info' });
+                setTimeout(() => this.remove(id), t.type === 'error' ? 6000 : 4000);
+            },
+            remove(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
+            _id: 0,
+            init() {
+                Livewire.on('toast', (e) => this.add(Array.isArray(e) ? e[0] : e));
+                @if (session('admin_toast')) this.add(@js(session('admin_toast'))); @endif
+            }
+         }"
+         class="pointer-events-none fixed inset-x-0 top-4 z-[70] flex flex-col items-center gap-2 px-4 sm:items-end sm:px-6"
+         role="status" aria-live="polite">
+        <template x-for="t in toasts" :key="t.id">
+            <div @click="remove(t.id)" x-transition
+                 class="pointer-events-auto card flex w-full max-w-sm cursor-pointer items-start gap-2.5 p-3.5 text-sm font-semibold"
+                 :class="t.type === 'error' ? 'border-rose-500/50 text-rose-200'
+                        : (t.type === 'success' ? 'border-emerald-500/50 text-emerald-200' : 'border-gold-500/40 text-gold-300')">
+                <svg x-show="t.type === 'success'" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                <svg x-show="t.type === 'error'" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                <svg x-show="t.type !== 'success' && t.type !== 'error'" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+                <span class="flex-1" x-text="t.message"></span>
+            </div>
+        </template>
+    </div>
 </body>
 </html>

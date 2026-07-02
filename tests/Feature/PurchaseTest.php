@@ -139,7 +139,7 @@ final class PurchaseTest extends TestCase
         ));
     }
 
-    public function test_referrer_is_rewarded_on_first_purchase(): void
+    public function test_referrer_invite_count_increments_on_first_purchase(): void
     {
         Queue::fake();
         app(PlayerService::class)->resolve(555, 'Referrer');
@@ -159,6 +159,7 @@ final class PurchaseTest extends TestCase
         ));
 
         $this->assertSame(1, $referrer->fresh()->referral_count);
-        $this->assertSame(1, $referrer->fresh()->free_tickets);
+        // Referrals count for the leaderboard only — no free tickets are granted.
+        $this->assertSame(0, $referrer->fresh()->free_tickets);
     }
 }

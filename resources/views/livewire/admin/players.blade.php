@@ -4,10 +4,6 @@
         <p class="text-sm text-slate-400">Search, adjust balances, and manage access.</p>
     </div>
 
-    @if ($flash)
-        <div class="card mb-4 border-emerald-500/30 p-3 text-sm font-semibold text-emerald-300">{{ $flash }}</div>
-    @endif
-
     <div class="mb-4">
         <input type="search" wire:model.live.debounce.300ms="search" class="input" placeholder="Search name, @username, phone, or Telegram id…">
     </div>
@@ -86,7 +82,11 @@
                         <input type="text" wire:model="adjustNote" class="input" maxlength="120" placeholder="reason">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button wire:click="saveAdjust" class="btn-gold py-2.5">Save</button>
+                        <button wire:click="saveAdjust" wire:loading.attr="disabled" wire:target="saveAdjust" class="btn-gold py-2.5">
+                            <x-admin.spinner wire:loading wire:target="saveAdjust" />
+                            <span wire:loading.remove wire:target="saveAdjust">Save</span>
+                            <span wire:loading wire:target="saveAdjust">Saving…</span>
+                        </button>
                         <button wire:click="$set('editing', null)" class="btn-ghost py-2.5">Cancel</button>
                     </div>
                 </div>

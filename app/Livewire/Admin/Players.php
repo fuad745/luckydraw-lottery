@@ -28,8 +28,6 @@ final class Players extends Component
 
     public string $adjustNote = '';
 
-    public string $flash = '';
-
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -70,7 +68,7 @@ final class Players extends Component
             return;
         }
 
-        $this->flash = "Adjusted {$player->name}'s balance.";
+        $this->dispatch('toast', message: "Adjusted {$player->name}'s balance.", type: 'success');
         $this->editing = null;
     }
 
@@ -79,7 +77,7 @@ final class Players extends Component
         $player = Player::find($telegramId);
         if ($player !== null) {
             $player->update(['banned_at' => $player->isBanned() ? null : now()]);
-            $this->flash = $player->isBanned() ? "{$player->name} banned." : "{$player->name} unbanned.";
+            $this->dispatch('toast', message: $player->isBanned() ? "{$player->name} banned." : "{$player->name} unbanned.", type: 'success');
         }
     }
 

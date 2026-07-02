@@ -9,9 +9,11 @@ use App\Models\Player;
 final class ReferralService
 {
     /**
-     * Reward the referrer the first time a referred player buys a ticket.
-     * Idempotent per player via the one-shot `referral_rewarded` flag we
-     * derive from total_tickets_bought (reward only on the very first buy).
+     * Credit the referrer's invite count the first time a referred player buys
+     * a ticket. Counting on first purchase (not signup) keeps the leaderboard
+     * honest — only invites who actually play count. No free tickets or other
+     * monetary reward is granted. Idempotent per player via the one-shot
+     * `referral_rewarded_at` claim.
      */
     public function rewardOnFirstPurchase(Player $buyer, int $previousTicketCount): void
     {
@@ -20,7 +22,7 @@ final class ReferralService
         }
 
         // Atomic one-shot claim: only the first concurrent caller flips
-        // null → now() and proceeds, so the referrer is never rewarded twice.
+        // null → now() and proceeds, so the referrer is never counted twice.
         $claimed = Player::whereKey($buyer->telegram_id)
             ->whereNull('referral_rewarded_at')
             ->update(['referral_rewarded_at' => now()]);
@@ -33,15 +35,6 @@ final class ReferralService
             ->where('telegram_id', '!=', $buyer->telegram_id) // no self-referral
             ->first();
 
-        if ($referrer === null) {
-            return;
-        }
-
-        $reward = (int) config('lottery.referral_reward_tickets', 1);
-
-        $referrer->increment('referral_count');
-        if ($reward > 0) {
-            $referrer->increment('free_tickets', $reward);
-        }
+        $referrer?->increment('referral_count');
     }
 }

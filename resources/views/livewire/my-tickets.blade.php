@@ -27,9 +27,12 @@
                             $myPrize = $t->is_winner ? ($t->is_split ? round((float) $t->prize_amount / 2, 2) : (float) $t->prize_amount) : 0;
                             $medal = ['🥇','🥈','🥉'][($t->win_rank ?? 0) - 1] ?? '🏆';
                         @endphp
-                        <div class="ticket flex items-center justify-between rounded-xl px-4 py-3">
+                        {{-- Half tickets are sky, full tickets gold — colour + label, at a glance. --}}
+                        <div class="ticket {{ $t->is_split ? 'ticket-half' : '' }} flex items-center justify-between rounded-xl px-4 py-3">
                             <div>
-                                <p class="text-lg font-black text-gold-300">#{{ $t->ticket_number }} <span class="text-[10px] font-medium text-slate-500">{{ $myStake }}</span></p>
+                                <p class="text-lg font-black {{ $t->is_split ? 'text-sky-300' : 'text-gold-300' }}">#{{ $t->ticket_number }}
+                                    <span class="ml-0.5 align-middle text-[10px] font-semibold {{ $t->is_split ? 'text-sky-400' : 'text-gold-500' }}">{{ $myStake }}</span>
+                                </p>
                                 <p class="text-xs text-slate-400">{{ $t->ownershipLabel() }}</p>
                             </div>
                             <div class="flex flex-col items-end gap-1">
@@ -39,7 +42,7 @@
                                     <span class="badge bg-slate-500/15 text-slate-400">{{ __('No win') }}</span>
                                 @endif
                                 @if ($t->is_split)
-                                    <span class="badge bg-indigo-500/20 text-indigo-300">🤝 {{ $iAmCoOwner ? __('co-owner') : ($t->co_owner_telegram_id ? __('shared') : __('½ open')) }}</span>
+                                    <span class="badge bg-sky-500/20 text-sky-300">🤝 {{ $iAmCoOwner ? __('co-owner') : ($t->co_owner_telegram_id ? __('shared') : __('½ open')) }}</span>
                                 @endif
                                 <span class="text-[10px] text-slate-500">{{ $t->purchased_at?->diffForHumans() }}</span>
                             </div>

@@ -45,6 +45,42 @@
                 <p class="mb-3 rounded-lg bg-amber-500/15 p-2 text-xs text-amber-300">⚠️ {{ __("Payment verification isn't configured yet (set :key).", ['key' => 'VERIFY_API_KEY']) }}</p>
             @endunless
 
+            {{-- Where to send the money — individually configured accounts, copyable --}}
+            @if (count($depositTargets))
+                <div class="mb-4">
+                    <p class="label">{{ __('1 · Send your deposit to') }}</p>
+                    <div class="space-y-2">
+                        @foreach ($depositTargets as $acc)
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gold-500/20 bg-gold-500/5 p-3"
+                                 x-data="{ copied: false,
+                                           copy() {
+                                               navigator.clipboard?.writeText(@js($acc['number'])).then(() => {
+                                                   this.copied = true;
+                                                   window.luckyHaptic && window.luckyHaptic('selection');
+                                                   setTimeout(() => this.copied = false, 1800);
+                                               });
+                                           } }">
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-gold-400">{{ strtoupper($acc['provider']) }}</p>
+                                    <p class="truncate font-mono text-sm font-bold tabular-nums text-slate-100">{{ $acc['number'] }}</p>
+                                    @if (($acc['name'] ?? '') !== '')
+                                        <p class="truncate text-xs text-slate-400">{{ $acc['name'] }}</p>
+                                    @endif
+                                </div>
+                                <button type="button" @click="copy()"
+                                        class="btn-ghost shrink-0 px-3 py-2 text-xs"
+                                        :class="copied && 'border-emerald-500/50 text-emerald-300'"
+                                        :aria-label="copied ? '{{ __('Copied') }}' : '{{ __('Copy account number') }}'">
+                                    <span x-show="!copied">{{ __('Copy') }}</span>
+                                    <span x-show="copied" x-cloak>✓ {{ __('Copied') }}</span>
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                    <p class="label mt-4">{{ __('2 · Then confirm it below') }}</p>
+                </div>
+            @endif
+
             <p class="mb-3 text-xs text-slate-400">{{ $instructions }}</p>
 
             <label class="label" for="dep-provider">{{ __('Payment method') }}</label>

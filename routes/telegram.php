@@ -53,6 +53,19 @@ $startHandler = static function (Nutgram $bot, ?string $payload = null) use ($pl
     $bot->sendMessage(
         text: '🎰 <b>Welcome to LuckyDraw, '.Html::tg($me->name)."!</b>\n\n".
             "Buy tickets, pick your lucky number, split tickets with friends, and win the prize pool when the draw happens.\n\n".
+            "<b>Getting started</b>\n".
+            "1️⃣ Top up your wallet — /deposit\n".
+            "2️⃣ Pick your numbers on the live board in the app\n".
+            "3️⃣ When the last ticket sells, the draw runs and winners are paid instantly\n\n".
+            "<b>Commands</b>\n".
+            "🎟 /start — open the game\n".
+            "👛 /balance — check your wallet\n".
+            "💵 /deposit — top up your balance\n".
+            "🎫 /mytickets — your tickets\n".
+            "🏆 /results — latest draw results\n".
+            "📊 /leaderboard — top inviters &amp; winners\n".
+            "❓ /help — how to play\n\n".
+            "💡 <i>Fastest deposit: just paste your Telebirr/CBE/M-Pesa payment SMS into this chat.</i>\n\n".
             "Tap the button below to open the game 👇\n\n".
             "<i>Your referral link:</i>\n".$me->referralLink((string) config('lottery.bot_username')),
         parse_mode: ParseMode::HTML,
@@ -75,7 +88,7 @@ $bot->onCommand('help', function (Nutgram $bot): void {
             "4️⃣ When the last ticket sells (or the deadline hits), the draw runs automatically.\n".
             "5️⃣ Winners are paid straight to their wallet — cash out anytime.\n\n".
             "🏆 Multiple winners share the pot by tier; ½-tickets split their share.\n".
-            "👥 Invite friends with your referral link for free tickets!\n\n".
+            "👥 Invite friends with your referral link and climb the leaderboard!\n\n".
             "💵 <i>To deposit fast: just paste your Telebirr/CBE/M-Pesa payment SMS into this chat.</i>\n\n".
             'Commands: /start /balance /deposit /mytickets /results /leaderboard /help',
         parse_mode: ParseMode::HTML,
@@ -135,10 +148,23 @@ $bot->onCommand('balance', function (Nutgram $bot) use ($player): void {
 | /deposit — discoverable entry point for the paste-your-SMS deposit flow.
 */
 $bot->onCommand('deposit', function (Nutgram $bot): void {
+    // The operator-configured accounts players should send money to.
+    $accounts = collect((array) config('lottery.payments.deposit_account_list', []))
+        ->map(function (array $a): string {
+            $name = trim((string) ($a['name'] ?? ''));
+
+            return '• <b>'.strtoupper((string) $a['provider']).'</b>: <code>'.Html::tg((string) $a['number']).'</code>'
+                .($name !== '' ? ' — '.Html::tg($name) : '');
+        });
+
+    $accountBlock = $accounts->isNotEmpty()
+        ? "<b>Send your top-up to:</b>\n".$accounts->implode("\n")."\n\n"
+        : "Send your top-up to our Telebirr / CBE / M-Pesa account.\n\n";
+
     $bot->sendMessage(
         text: "💵 <b>Add funds</b>\n\n".
-            'Send your top-up to our Telebirr / CBE / M-Pesa account, then simply '.
-            "<b>paste the confirmation SMS or receipt link right here</b> — I'll read the ".
+            $accountBlock.
+            "Then simply <b>paste the confirmation SMS or receipt link right here</b> — I'll read the ".
             "transaction number, verify it, and credit your wallet automatically.\n\n".
             'Prefer buttons? Open the wallet 👇',
         parse_mode: ParseMode::HTML,

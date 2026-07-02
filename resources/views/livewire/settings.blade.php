@@ -6,8 +6,8 @@
         }); },
         updateContact(){ window.luckyRequestContact((phone) => { if (phone) $wire.updatePhone(phone); }); } }">
     <header class="mb-4">
-        <h1 class="text-2xl font-black gold-text">{{ __('Settings') }}</h1>
-        <p class="text-xs text-slate-400">{{ __('Your preferences') }}</p>
+        <h1 class="text-2xl font-black gold-text">{{ __('Profile') }}</h1>
+        <p class="text-xs text-slate-400">{{ __('Your account & preferences') }}</p>
     </header>
 
     {{-- Toast --}}
@@ -50,7 +50,7 @@
                 </div>
                 <div class="flex items-center justify-between">
                     <dt class="text-slate-400">{{ __('Invited') }}</dt>
-                    <dd class="text-slate-200">{{ __(':count friends', ['count' => (int) $player->referral_count]) }} · {{ __(':count free', ['count' => (int) $player->free_tickets]) }}</dd>
+                    <dd class="text-slate-200">{{ __(':count friends', ['count' => (int) $player->referral_count]) }}</dd>
                 </div>
                 <div class="flex items-center justify-between">
                     <dt class="text-slate-400">{{ __('Joined') }}</dt>
@@ -59,6 +59,18 @@
             </dl>
         </section>
     @endif
+
+    {{-- Past rounds (History moved out of the bottom nav) --}}
+    <a href="{{ route('history') }}" wire:navigate
+       class="card mb-4 flex items-center justify-between p-4 text-sm font-medium text-slate-200 transition hover:bg-white/5 focus-ring">
+        <span class="flex items-center gap-2.5">
+            <svg class="h-5 w-5 text-gold-400" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            {{ __('Past rounds & results') }}
+        </span>
+        <span class="text-slate-500" aria-hidden="true">›</span>
+    </a>
 
     {{-- Language --}}
     <section class="card p-4">

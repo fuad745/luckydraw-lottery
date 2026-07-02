@@ -19,14 +19,12 @@ final class Withdrawals extends Component
 
     public string $filter = 'pending';
 
-    public string $flash = '';
-
     public function approve(int $id, WithdrawalService $service): void
     {
         $tx = Transaction::find($id);
         if ($tx !== null) {
             $service->approve($tx);
-            $this->flash = "Withdrawal #{$id} marked as paid.";
+            $this->dispatch('toast', message: "Withdrawal #{$id} marked as paid.", type: 'success');
         }
     }
 
@@ -35,7 +33,7 @@ final class Withdrawals extends Component
         $tx = Transaction::find($id);
         if ($tx !== null) {
             $service->reject($tx, 'Declined by admin');
-            $this->flash = "Withdrawal #{$id} refunded.";
+            $this->dispatch('toast', message: "Withdrawal #{$id} refunded.", type: 'success');
         }
     }
 

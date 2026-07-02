@@ -5,10 +5,6 @@
     </div>
 
     {{-- Payment settings --}}
-    @if ($payFlash)
-        <div class="card mb-4 border-emerald-500/30 p-3 text-sm font-semibold text-emerald-300">{{ $payFlash }}</div>
-    @endif
-
     <form wire:submit="savePayments" class="card mb-8 max-w-lg space-y-4 p-5">
         <h2 class="text-lg font-bold text-slate-100">💳 Payments</h2>
 
@@ -24,6 +20,37 @@
                 @endforeach
             </div>
             @error('providers') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div>
+            <div class="mb-1.5 flex items-center justify-between">
+                <span class="label mb-0">Deposit accounts (shown to players)</span>
+                <button type="button" wire:click="addAccountRow" class="btn-ghost px-3 py-1.5 text-xs">+ Add account</button>
+            </div>
+            <p class="mb-2 text-xs text-slate-500">Each account is shown as a copyable card on the deposit screen and in the bot's /deposit reply.</p>
+
+            @if (count($accountList) === 0)
+                <p class="rounded-xl border border-dashed border-white/10 p-3 text-center text-xs text-slate-500">No accounts yet — players only see the free-text instructions below. Add one 👆</p>
+            @endif
+
+            <div class="space-y-2">
+                @foreach ($accountList as $i => $row)
+                    <div class="rounded-xl border border-white/10 p-3" wire:key="acc-{{ $i }}">
+                        <div class="grid grid-cols-[7.5rem_1fr_auto] gap-2">
+                            <select wire:model="accountList.{{ $i }}.provider" class="input py-2 text-sm" aria-label="Provider">
+                                @foreach ($supportedProviders as $p)
+                                    <option value="{{ $p }}">{{ strtoupper($p) }}</option>
+                                @endforeach
+                            </select>
+                            <input type="text" wire:model="accountList.{{ $i }}.number" class="input py-2 text-sm" placeholder="Account / phone number" aria-label="Account number">
+                            <button type="button" wire:click="removeAccountRow({{ $i }})" class="btn-ghost px-3 py-2 text-rose-300" aria-label="Remove account">✕</button>
+                        </div>
+                        <input type="text" wire:model="accountList.{{ $i }}.name" class="input mt-2 py-2 text-sm" placeholder="Account holder name (optional)" aria-label="Account name">
+                        @error('accountList.'.$i.'.number') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                        @error('accountList.'.$i.'.provider') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                    </div>
+                @endforeach
+            </div>
         </div>
 
         <div>
@@ -53,16 +80,13 @@
         </div>
 
         <button type="submit" wire:loading.attr="disabled" wire:target="savePayments" class="btn-gold w-full sm:w-auto sm:px-8">
+            <x-admin.spinner wire:loading wire:target="savePayments" />
             <span wire:loading.remove wire:target="savePayments">Save payment settings</span>
             <span wire:loading wire:target="savePayments">Saving…</span>
         </button>
     </form>
 
     {{-- Admin credentials --}}
-    @if ($flash)
-        <div class="card mb-4 border-emerald-500/30 p-3 text-sm font-semibold text-emerald-300">{{ $flash }}</div>
-    @endif
-
     <form wire:submit="save" class="card max-w-lg space-y-4 p-5">
         <h2 class="text-lg font-bold text-slate-100">🔐 Admin login</h2>
 
@@ -94,7 +118,8 @@
             <p class="mt-1 text-xs text-slate-500">Required to save any change.</p>
         </div>
 
-        <button type="submit" wire:loading.attr="disabled" class="btn-gold w-full sm:w-auto sm:px-8">
+        <button type="submit" wire:loading.attr="disabled" wire:target="save" class="btn-gold w-full sm:w-auto sm:px-8">
+            <x-admin.spinner wire:loading wire:target="save" />
             <span wire:loading.remove wire:target="save">Save changes</span>
             <span wire:loading wire:target="save">Saving…</span>
         </button>

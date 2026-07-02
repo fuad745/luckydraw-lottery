@@ -4,10 +4,6 @@
         <p class="text-sm text-slate-400">Send a Telegram message to your players.</p>
     </div>
 
-    @if ($flash)
-        <div class="card mb-4 border-emerald-500/30 p-3 text-sm font-semibold text-emerald-300">{{ $flash }}</div>
-    @endif
-
     <div class="card max-w-2xl p-5">
         <label class="label">Audience</label>
         <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -31,8 +27,12 @@
         <textarea id="bmsg" wire:model="message" rows="6" class="input" placeholder="🎉 A new round starts in 10 minutes — top up and join!"></textarea>
         @error('message') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
 
-        <button wire:click="send" wire:confirm="Send this message to the selected players?" wire:loading.attr="disabled"
-                class="btn-gold mt-4 w-full sm:w-auto sm:px-8">Send broadcast</button>
+        <button wire:click="send" wire:confirm="Send this message to the selected players?"
+                wire:loading.attr="disabled" wire:target="send" class="btn-gold mt-4 w-full sm:w-auto sm:px-8">
+            <x-admin.spinner wire:loading wire:target="send" />
+            <span wire:loading.remove wire:target="send">Send broadcast</span>
+            <span wire:loading wire:target="send">Sending…</span>
+        </button>
         <p class="mt-2 text-xs text-slate-500">Messages are queued and delivered by the worker. Only users who have started the bot receive DMs.</p>
     </div>
 </div>
