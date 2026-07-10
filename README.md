@@ -1,5 +1,7 @@
 # 🎰 LuckyDraw — Telegram Mini App Lottery
 
+> **🎮 Try it live:** [@Laklottery_bot](https://t.me/Laklottery_bot) on Telegram
+
 A full-stack **Telegram Mini App** lottery game built entirely in **Laravel 13 + Livewire 4** —
 so you can maintain it in PHP/Blade with almost no JavaScript.
 
