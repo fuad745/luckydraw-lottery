@@ -79,9 +79,11 @@ final class DepositService
             throw ValidationException::withMessages(['reference' => 'This reference has already been used.']);
         }
 
+        // Key 'verify' = the claim itself couldn't be machine-verified (vs. a
+        // fixable input error) — depositWithFallback() routes these to manual review.
         $result = $this->verifier->verify($reference, $provider, $opts);
         if (! $result['success']) {
-            throw ValidationException::withMessages(['reference' => $result['error'] ?? 'Verification failed.']);
+            throw ValidationException::withMessages(['verify' => $result['error'] ?? 'Verification failed.']);
         }
 
         $amount = (float) $result['amount'];
@@ -116,6 +118,31 @@ final class DepositService
         }
 
         return $tx;
+    }
+
+    /**
+     * One-button deposit: verify automatically, and when the claim itself
+     * can't be machine-verified (service down/unconfigured, receipt not
+     * found, receiver mismatch) queue it for manual admin review instead.
+     * Fixable input errors (duplicate reference, ban, below minimum) still
+     * surface to the player.
+     *
+     * @param  array{suffix?:string,phone?:string}  $opts
+     * @return array{status:'credited'|'pending', tx:Transaction}
+     *
+     * @throws ValidationException
+     */
+    public function depositWithFallback(Player $player, string $provider, string $reference, string $name, string $phone, array $opts = []): array
+    {
+        try {
+            return ['status' => 'credited', 'tx' => $this->deposit($player, $provider, $reference, $opts)];
+        } catch (ValidationException $e) {
+            if (! array_key_exists('verify', $e->errors())) {
+                throw $e;
+            }
+
+            return ['status' => 'pending', 'tx' => $this->requestManual($player, $provider, $name, $phone, $reference)];
+        }
     }
 
     /**
@@ -274,7 +301,7 @@ final class DepositService
                 Log::error('Deposit blocked: DEPOSIT_ACCOUNTS is not configured, so "paid to us" cannot be verified.');
 
                 throw ValidationException::withMessages([
-                    'reference' => 'Deposits are temporarily unavailable. Please contact support.',
+                    'verify' => 'Deposits are temporarily unavailable. Please contact support.',
                 ]);
             }
 
@@ -303,7 +330,7 @@ final class DepositService
         }
 
         throw ValidationException::withMessages([
-            'reference' => 'That payment was not made to our account. Send to the listed account and try again.',
+            'verify' => 'That payment was not made to our account. Send to the listed account and try again.',
         ]);
     }
 }

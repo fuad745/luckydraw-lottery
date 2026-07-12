@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
 use App\Models\Transaction;
 use App\Services\DepositService;
-use App\Services\PaymentVerifier;
 use App\Services\WithdrawalService;
 use App\Telegram\TelegramAuth;
 use Illuminate\Validation\ValidationException;
@@ -24,14 +24,11 @@ final class Wallet extends Component
 
     public string $cbeAccount = '';   // player's full CBE account number (we derive the suffix)
 
-    public string $payerPhone = '';   // CBE Birr / M-Pesa
+    // Payer identity — sent to the verifier as a lookup hint and kept on the
+    // claim if it falls back to manual admin review. Prefilled in mount().
+    public string $payerName = '';
 
-    // Manual review fallback (used when automatic verification fails)
-    public bool $showManual = false;
-
-    public string $manualName = '';
-
-    public string $manualPhone = '';
+    public string $payerPhone = '';
 
     // Withdraw form. Nullable so clearing the input hydrates to null instead of
     // throwing a 500 on a typed float; withdraw() casts and the service validates.
@@ -46,6 +43,14 @@ final class Wallet extends Component
         return app(TelegramAuth::class);
     }
 
+    public function mount(): void
+    {
+        $player = $this->auth()->player();
+        $this->payerName = (string) ($player?->name ?? '');
+        $this->payerPhone = (string) ($player?->phone ?? '');
+    }
+
+    /** One button: verify automatically, fall back to manual admin review. */
     public function deposit(DepositService $deposits): void
     {
         $player = $this->auth()->player();
@@ -56,44 +61,27 @@ final class Wallet extends Component
         }
 
         try {
-            $tx = $deposits->deposit($player, $this->provider, $this->reference, [
+            $result = $deposits->depositWithFallback($player, $this->provider, $this->reference, $this->payerName, $this->payerPhone, [
                 'suffix' => $this->cbeAccount ?: null,
                 'phone' => $this->payerPhone ?: null,
             ]);
         } catch (ValidationException $e) {
-            // Offer the manual-review fallback right where the player is stuck.
-            $this->showManual = true;
             $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
 
             return;
         }
 
-        $this->reset('reference', 'cbeAccount', 'payerPhone', 'showManual');
-        $this->dispatch('haptic', type: 'notification', style: 'success');
-        $this->dispatch('toast', message: __('Deposit confirmed: +:amount :currency', ['amount' => $tx->amount, 'currency' => config('lottery.currency')]), type: 'success');
-    }
+        $this->reset('reference', 'cbeAccount');
 
-    /** Submit the pasted SMS for admin review instead of automatic verification. */
-    public function depositManual(DepositService $deposits): void
-    {
-        $player = $this->auth()->player();
-        if ($player === null) {
-            $this->dispatch('toast', message: __('Open from Telegram to deposit.'), type: 'error');
+        if ($result['status'] === 'credited') {
+            $this->dispatch('haptic', type: 'notification', style: 'success');
+            $this->dispatch('toast', message: __('Deposit confirmed: +:amount :currency', ['amount' => $result['tx']->amount, 'currency' => config('lottery.currency')]), type: 'success');
 
             return;
         }
 
-        try {
-            $deposits->requestManual($player, $this->provider, $this->manualName, $this->manualPhone, $this->reference);
-        } catch (ValidationException $e) {
-            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
-
-            return;
-        }
-
-        $this->reset('reference', 'cbeAccount', 'payerPhone', 'showManual');
-        $this->dispatch('haptic', type: 'notification', style: 'success');
-        $this->dispatch('toast', message: __('Sent for review — your balance will update once an admin approves it.'), type: 'success');
+        $this->dispatch('haptic', type: 'notification', style: 'warning');
+        $this->dispatch('toast', message: __('We could not verify it automatically — your deposit is with the admin for approval. Your balance will update once approved.'), type: 'info');
     }
 
     public function withdraw(WithdrawalService $withdrawals): void
@@ -135,6 +123,13 @@ final class Wallet extends Component
 
         $providers = (array) config('lottery.payments.providers', []);
 
+        // A manual claim awaiting admin approval — shown as a banner so the
+        // player knows to wait instead of resubmitting.
+        $pendingDeposit = $player !== null && Transaction::where('telegram_id', $auth->id())
+            ->where('type', TransactionType::Deposit->value)
+            ->where('status', TransactionStatus::Pending->value)
+            ->exists();
+
         // Operator's receiving accounts to display — only for enabled providers.
         $depositTargets = array_values(array_filter(
             (array) config('lottery.payments.deposit_account_list', []),
@@ -152,7 +147,7 @@ final class Wallet extends Component
             'minDeposit' => (float) config('lottery.payments.min_deposit', 10),
             'minWithdraw' => (float) config('lottery.payments.min_withdraw', 50),
             'instructions' => config('lottery.payments.deposit_instructions'),
-            'verifyReady' => app(PaymentVerifier::class)->configured(),
+            'pendingDeposit' => $pendingDeposit,
         ]);
     }
 }

@@ -73,6 +73,43 @@ final class ManualDepositTest extends TestCase
         $this->assertSame(TransactionStatus::Pending, $retry->status);
     }
 
+    public function test_fallback_queues_a_manual_review_when_verification_fails(): void
+    {
+        config(['lottery.payments.verify_key' => 'test-key']);
+        \Illuminate\Support\Facades\Http::fake(['*/verify' => \Illuminate\Support\Facades\Http::response(['success' => false, 'error' => 'Receipt not found'], 404)]);
+        $player = Player::factory()->create(['balance' => 0]);
+
+        $result = app(DepositService::class)->depositWithFallback($player, 'telebirr', self::SMS, 'Abebe Kebede', '0911223344');
+
+        $this->assertSame('pending', $result['status']);
+        $this->assertSame(TransactionStatus::Pending, $result['tx']->status);
+        $this->assertSame(0.0, (float) $player->fresh()->balance);
+    }
+
+    public function test_fallback_credits_directly_when_verification_succeeds(): void
+    {
+        config(['lottery.payments.verify_key' => 'test-key', 'lottery.payments.deposit_accounts' => []]);
+        \Illuminate\Support\Facades\Http::fake(['*/verify' => \Illuminate\Support\Facades\Http::response(['success' => true, 'transactionAmount' => 250, 'receiverName' => 'LuckyDraw'])]);
+        $player = Player::factory()->create(['balance' => 0]);
+
+        $result = app(DepositService::class)->depositWithFallback($player, 'telebirr', self::SMS, 'Abebe Kebede', '0911223344');
+
+        $this->assertSame('credited', $result['status']);
+        $this->assertSame(250.0, (float) $player->fresh()->balance);
+    }
+
+    public function test_fallback_surfaces_a_duplicate_reference_instead_of_queueing(): void
+    {
+        config(['lottery.payments.verify_key' => 'test-key', 'lottery.payments.deposit_accounts' => []]);
+        \Illuminate\Support\Facades\Http::fake(['*/verify' => \Illuminate\Support\Facades\Http::response(['success' => true, 'transactionAmount' => 250, 'receiverName' => 'LuckyDraw'])]);
+        $player = Player::factory()->create(['balance' => 0]);
+        $service = app(DepositService::class);
+        $service->depositWithFallback($player, 'telebirr', self::SMS, 'Abebe Kebede', '0911223344');
+
+        $this->expectException(ValidationException::class);
+        $service->depositWithFallback($player, 'telebirr', self::SMS, 'Abebe Kebede', '0911223344');
+    }
+
     public function test_the_same_reference_cannot_be_queued_twice(): void
     {
         $a = Player::factory()->create();
