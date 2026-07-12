@@ -25,6 +25,7 @@ final class PaymentSettings
         'pay_min_withdraw' => 'lottery.payments.min_withdraw',
         'pay_deposit_instructions' => 'lottery.payments.deposit_instructions',
         'pay_deposit_account_list' => 'lottery.payments.deposit_account_list',
+        'pay_verify_key' => 'lottery.payments.verify_key',
     ];
 
     /** Merge stored overrides into runtime config (called once per request in boot). */
@@ -42,6 +43,11 @@ final class PaymentSettings
             }
             $value = (string) $rows->get($key);
 
+            // An empty stored key means "not set here" — keep the .env value.
+            if ($key === 'pay_verify_key' && trim($value) === '') {
+                continue;
+            }
+
             config([$configKey => match ($key) {
                 'pay_providers', 'pay_deposit_accounts' => $this->toList($value),
                 'pay_min_deposit', 'pay_min_withdraw' => (float) $value,
@@ -54,7 +60,7 @@ final class PaymentSettings
     /**
      * Current effective values (override or config default), for the admin form.
      *
-     * @return array{providers:array<int,string>, deposit_accounts:string, min_deposit:float, min_withdraw:float, deposit_instructions:string, account_list:array<int,array{provider:string,name:string,number:string}>}
+     * @return array{providers:array<int,string>, deposit_accounts:string, min_deposit:float, min_withdraw:float, deposit_instructions:string, account_list:array<int,array{provider:string,name:string,number:string}>, verify_key:string}
      */
     public function snapshot(): array
     {
@@ -66,6 +72,7 @@ final class PaymentSettings
             'min_withdraw' => (float) config('lottery.payments.min_withdraw', 50),
             'deposit_instructions' => (string) config('lottery.payments.deposit_instructions', ''),
             'account_list' => $this->normaliseAccounts((array) config('lottery.payments.deposit_account_list', [])),
+            'verify_key' => (string) config('lottery.payments.verify_key', ''),
         ];
     }
 
@@ -76,10 +83,11 @@ final class PaymentSettings
      * @param  array<int,string>  $providers
      * @param  array<int,array{provider?:string,name?:string,number?:string}>  $accountList
      */
-    public function save(array $providers, string $depositAccounts, float $minDeposit, float $minWithdraw, string $depositInstructions, array $accountList = []): void
+    public function save(array $providers, string $depositAccounts, float $minDeposit, float $minWithdraw, string $depositInstructions, array $accountList = [], string $verifyKey = ''): void
     {
         $providers = array_values(array_intersect(self::SUPPORTED, $providers));
 
+        Setting::put('pay_verify_key', trim($verifyKey));
         Setting::put('pay_providers', implode(',', $providers));
         Setting::put('pay_deposit_accounts', implode(',', $this->toList($depositAccounts)));
         Setting::put('pay_min_deposit', (string) max(0, $minDeposit));

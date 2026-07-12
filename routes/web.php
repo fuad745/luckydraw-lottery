@@ -6,6 +6,7 @@ use App\Http\Controllers\TelegramWebhookController;
 use App\Livewire\Admin\Broadcast;
 use App\Livewire\Admin\CreateRound;
 use App\Livewire\Admin\Dashboard;
+use App\Livewire\Admin\Deposits;
 use App\Livewire\Admin\Players;
 use App\Livewire\Admin\Rounds;
 use App\Livewire\Admin\Settings as AdminSettings;
@@ -54,6 +55,7 @@ Route::prefix('admin')->group(function (): void {
         Route::get('rounds', Rounds::class)->name('admin.rounds');
         Route::get('rounds/create', CreateRound::class)->name('admin.rounds.create');
         Route::get('players', Players::class)->name('admin.players');
+        Route::get('deposits', Deposits::class)->name('admin.deposits');
         Route::get('withdrawals', Withdrawals::class)->name('admin.withdrawals');
         Route::get('transactions', Transactions::class)->name('admin.transactions');
         Route::get('transactions/export', TransactionExportController::class)->name('admin.transactions.export');

@@ -73,7 +73,13 @@ window.luckyRequestContact = (onPhone) => {
     try { tg.onEvent('contactRequested', handler); } catch (err) { /* noop */ }
     tg.requestContact((ok, res) => {
         const phone = res?.responseUnsafe?.contact?.phone_number || res?.contact?.phone_number;
-        if (phone) onPhone(phone);
+        if (phone) {
+            onPhone(phone);
+        } else if (!ok) {
+            // Declined/dismissed — unblock the caller so the button can retry.
+            try { tg.offEvent('contactRequested', handler); } catch (err) { /* noop */ }
+            onPhone(null);
+        }
     });
 };
 

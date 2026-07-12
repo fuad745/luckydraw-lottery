@@ -15,12 +15,14 @@
             ['admin', 'dashboard', 'Dashboard'],
             ['admin.rounds', 'rounds', 'Rounds'],
             ['admin.players', 'players', 'Players'],
+            ['admin.deposits', 'transactions', 'Deposits'],
             ['admin.withdrawals', 'withdrawals', 'Withdrawals'],
             ['admin.transactions', 'transactions', 'Transactions'],
             ['admin.broadcast', 'broadcast', 'Broadcast'],
             ['admin.settings', 'settings', 'Settings'],
         ];
         $pendingWithdrawals = \App\Models\Transaction::where('type', 'withdrawal')->where('status', 'pending')->count();
+        $pendingDeposits = \App\Models\Transaction::where('type', 'deposit')->where('status', 'pending')->count();
     @endphp
 
     {{-- Mobile top bar --}}
@@ -58,6 +60,8 @@
                     <span>{{ $label }}</span>
                     @if ($route === 'admin.withdrawals' && $pendingWithdrawals > 0)
                         <span class="ml-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">{{ $pendingWithdrawals }}</span>
+                    @elseif ($route === 'admin.deposits' && $pendingDeposits > 0)
+                        <span class="ml-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">{{ $pendingDeposits }}</span>
                     @endif
                 </a>
             @endforeach

@@ -42,7 +42,7 @@
         {{-- Deposit --}}
         <section x-show="tab==='deposit'" x-cloak x-transition class="card mt-3 p-4">
             @unless ($verifyReady)
-                <p class="mb-3 rounded-lg bg-amber-500/15 p-2 text-xs text-amber-300">⚠️ {{ __("Payment verification isn't configured yet (set :key).", ['key' => 'VERIFY_API_KEY']) }}</p>
+                <p class="mb-3 rounded-lg bg-amber-500/15 p-2 text-xs text-amber-300">⚠️ {{ __('Automatic verification is unavailable right now — submit your deposit for manual review below and an admin will approve it.') }}</p>
             @endunless
 
             {{-- Where to send the money — individually configured accounts, copyable --}}
@@ -104,11 +104,40 @@
                 <input id="dep-phone" type="tel" wire:model="payerPhone" class="input" placeholder="{{ __('Auto-filled from your SMS if present') }}">
             @endif
 
-            <button wire:click="deposit" wire:loading.attr="disabled" wire:target="deposit" @unless ($verifyReady) disabled @endunless class="btn-gold mt-4 w-full disabled:opacity-50">
-                <span wire:loading.remove wire:target="deposit">{{ __('Verify & deposit') }}</span>
-                <span wire:loading wire:target="deposit">{{ __('Verifying…') }}</span>
-            </button>
-            <p class="mt-2 text-center text-[11px] text-slate-500">{{ __('Min :min :currency · we verify the payment automatically.', ['min' => $minDeposit, 'currency' => $currency]) }}</p>
+            @if ($verifyReady)
+                <button wire:click="deposit" wire:loading.attr="disabled" wire:target="deposit" class="btn-gold mt-4 w-full disabled:opacity-50">
+                    <span wire:loading.remove wire:target="deposit">{{ __('Verify & deposit') }}</span>
+                    <span wire:loading wire:target="deposit">{{ __('Verifying…') }}</span>
+                </button>
+                <p class="mt-2 text-center text-[11px] text-slate-500">{{ __('Min :min :currency · we verify the payment automatically.', ['min' => $minDeposit, 'currency' => $currency]) }}</p>
+            @endif
+
+            {{-- Manual review fallback — always available; opens automatically
+                 when automatic verification fails or isn't configured. --}}
+            <div class="mt-4 border-t border-white/5 pt-3">
+                @if (! $showManual && $verifyReady)
+                    <button type="button" wire:click="$set('showManual', true)" class="w-full text-center text-xs font-semibold text-gold-300 underline-offset-2 hover:underline">
+                        {{ __("Verification failed? Submit for manual review") }}
+                    </button>
+                @endif
+
+                @if ($showManual || ! $verifyReady)
+                    <p class="mb-2 text-xs font-semibold text-slate-300">🙋 {{ __('Manual review') }}</p>
+                    <p class="mb-3 text-[11px] text-slate-500">{{ __('Fill in your details — an admin checks the SMS above and credits your balance after approval.') }}</p>
+
+                    <label class="label" for="man-name">{{ __('Your full name') }}</label>
+                    <input id="man-name" type="text" wire:model="manualName" class="input mb-3" placeholder="{{ __('Name used for the payment') }}">
+
+                    <label class="label" for="man-phone">{{ __('Your phone number') }}</label>
+                    <input id="man-phone" type="tel" wire:model="manualPhone" class="input" placeholder="09XXXXXXXX">
+
+                    <button wire:click="depositManual" wire:loading.attr="disabled" wire:target="depositManual" class="btn-ghost mt-4 w-full">
+                        <span wire:loading.remove wire:target="depositManual">{{ __('Submit for manual review') }}</span>
+                        <span wire:loading wire:target="depositManual">{{ __('Submitting…') }}</span>
+                    </button>
+                    <p class="mt-2 text-center text-[11px] text-slate-500">{{ __('Uses the payment method and SMS you entered above.') }}</p>
+                @endif
+            </div>
         </section>
 
         {{-- Withdraw --}}

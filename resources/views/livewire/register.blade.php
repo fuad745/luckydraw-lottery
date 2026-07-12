@@ -4,7 +4,10 @@
             const d = Array.isArray(e) ? e[0] : e;
             this.toast = d.message; this.toastType = d.type || 'info';
             clearTimeout(this._t); this._t = setTimeout(() => this.toast = null, 6000);
-        }); },
+        });
+        // Ask for the contact immediately — the button below stays as the
+        // retry if the player dismisses the popup.
+        setTimeout(() => this.share(), 600); },
         share(){
             this.sharing = true;
             window.luckyRequestContact((phone) => {

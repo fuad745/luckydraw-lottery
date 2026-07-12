@@ -33,6 +33,8 @@ final class Settings extends Component
 
     public string $depositInstructions = '';
 
+    public string $verifyKey = '';
+
     /**
      * Deposit accounts shown to players, one row per account.
      *
@@ -51,6 +53,7 @@ final class Settings extends Component
         $this->minWithdraw = $snap['min_withdraw'];
         $this->depositInstructions = $snap['deposit_instructions'];
         $this->accountList = $snap['account_list'];
+        $this->verifyKey = $snap['verify_key'];
     }
 
     public function addAccountRow(): void
@@ -78,6 +81,7 @@ final class Settings extends Component
             'minDeposit' => ['required', 'numeric', 'min:0'],
             'minWithdraw' => ['required', 'numeric', 'min:0'],
             'depositInstructions' => ['nullable', 'string', 'max:1000'],
+            'verifyKey' => ['nullable', 'string', 'max:255'],
             'accountList' => ['array', 'max:12'],
             'accountList.*.provider' => ['required', 'in:'.implode(',', PaymentSettings::SUPPORTED)],
             'accountList.*.name' => ['nullable', 'string', 'max:80'],
@@ -94,6 +98,7 @@ final class Settings extends Component
             (float) $this->minWithdraw,
             $this->depositInstructions,
             $this->accountList,
+            $this->verifyKey,
         );
 
         // Re-apply + re-read so any normalisation (dropped rows, lowercased

@@ -26,6 +26,13 @@ final class Wallet extends Component
 
     public string $payerPhone = '';   // CBE Birr / M-Pesa
 
+    // Manual review fallback (used when automatic verification fails)
+    public bool $showManual = false;
+
+    public string $manualName = '';
+
+    public string $manualPhone = '';
+
     // Withdraw form. Nullable so clearing the input hydrates to null instead of
     // throwing a 500 on a typed float; withdraw() casts and the service validates.
     public ?float $amount = null;
@@ -54,14 +61,39 @@ final class Wallet extends Component
                 'phone' => $this->payerPhone ?: null,
             ]);
         } catch (ValidationException $e) {
+            // Offer the manual-review fallback right where the player is stuck.
+            $this->showManual = true;
             $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
 
             return;
         }
 
-        $this->reset('reference', 'cbeAccount', 'payerPhone');
+        $this->reset('reference', 'cbeAccount', 'payerPhone', 'showManual');
         $this->dispatch('haptic', type: 'notification', style: 'success');
         $this->dispatch('toast', message: __('Deposit confirmed: +:amount :currency', ['amount' => $tx->amount, 'currency' => config('lottery.currency')]), type: 'success');
+    }
+
+    /** Submit the pasted SMS for admin review instead of automatic verification. */
+    public function depositManual(DepositService $deposits): void
+    {
+        $player = $this->auth()->player();
+        if ($player === null) {
+            $this->dispatch('toast', message: __('Open from Telegram to deposit.'), type: 'error');
+
+            return;
+        }
+
+        try {
+            $deposits->requestManual($player, $this->provider, $this->manualName, $this->manualPhone, $this->reference);
+        } catch (ValidationException $e) {
+            $this->dispatch('toast', message: collect($e->errors())->flatten()->first(), type: 'error');
+
+            return;
+        }
+
+        $this->reset('reference', 'cbeAccount', 'payerPhone', 'showManual');
+        $this->dispatch('haptic', type: 'notification', style: 'success');
+        $this->dispatch('toast', message: __('Sent for review — your balance will update once an admin approves it.'), type: 'success');
     }
 
     public function withdraw(WithdrawalService $withdrawals): void

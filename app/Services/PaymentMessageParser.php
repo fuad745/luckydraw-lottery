@@ -140,6 +140,23 @@ final class PaymentMessageParser
     }
 
     /**
+     * Best-effort deposit amount from a pasted SMS ("ETB 400.00", "400 birr",
+     * or the first decimal amount) — a suggestion for manual review, only.
+     */
+    public function amount(string $text): ?float
+    {
+        if (preg_match('#\bETB\s*([\d,]+(?:\.\d{1,2})?)#i', $text, $m)
+            || preg_match('#([\d,]+(?:\.\d{1,2})?)\s*(?:ETB|birr)\b#i', $text, $m)
+            || preg_match('#\b(\d[\d,]*\.\d{2})\b#', $text, $m)) {
+            $amount = (float) str_replace(',', '', $m[1]);
+
+            return $amount > 0 ? $amount : null;
+        }
+
+        return null;
+    }
+
+    /**
      * Split a CBE receipt id into its FT reference and the trailing account
      * suffix (the last 8 digits of the sender's account CBE appends to the id).
      *

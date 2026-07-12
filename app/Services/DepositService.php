@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
 use App\Models\Player;
 use App\Models\Transaction;
+use App\Support\Money;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -113,6 +116,149 @@ final class DepositService
         }
 
         return $tx;
+    }
+
+    /**
+     * Fallback when automatic verification fails or is unavailable: record the
+     * player's claim (name, phone, pasted SMS) as a PENDING deposit for an
+     * admin to review. No funds move until approveManual().
+     *
+     * @throws ValidationException
+     */
+    public function requestManual(Player $player, string $provider, string $name, string $phone, string $sms): Transaction
+    {
+        $provider = strtolower(trim($provider));
+        $name = trim($name);
+        $phone = trim($phone);
+        $sms = trim($sms);
+
+        if ($player->isBanned()) {
+            throw ValidationException::withMessages(['reference' => 'Your account is suspended.']);
+        }
+        if (! in_array($provider, (array) config('lottery.payments.providers', []), true)) {
+            throw ValidationException::withMessages(['provider' => 'Unsupported payment provider.']);
+        }
+        if ($name === '') {
+            throw ValidationException::withMessages(['name' => 'Enter your full name.']);
+        }
+        if ($phone === '') {
+            throw ValidationException::withMessages(['phone' => 'Enter your phone number.']);
+        }
+        if ($sms === '') {
+            throw ValidationException::withMessages(['reference' => 'Paste the deposit SMS you received.']);
+        }
+
+        // One open review per player — stops accidental double-submits.
+        if (Transaction::where('telegram_id', $player->telegram_id)
+            ->where('type', TransactionType::Deposit->value)
+            ->where('status', TransactionStatus::Pending->value)->exists()) {
+            throw ValidationException::withMessages(['reference' => 'You already have a deposit awaiting review.']);
+        }
+
+        // Reference (if we can parse one) doubles as the dedupe key so the same
+        // SMS can't be credited twice — manually or automatically. The parser
+        // falls back to the whole text; only keep a real code-like token.
+        $reference = (string) ($this->parser->parse($sms, $provider)['reference'] ?? '');
+        if ($reference === '' || strlen($reference) > 64 || preg_match('/\s/', $reference)) {
+            $reference = null;
+        }
+        if ($reference !== null
+            && Transaction::where('provider', $provider)->where('deposit_reference', $reference)->exists()) {
+            throw ValidationException::withMessages(['reference' => 'This reference has already been used or is awaiting review.']);
+        }
+
+        try {
+            $tx = Transaction::create([
+                'telegram_id' => $player->telegram_id,
+                'type' => TransactionType::Deposit,
+                'status' => TransactionStatus::Pending,
+                'amount' => $this->parser->amount($sms) ?? 0,
+                'provider' => $provider,
+                'reference' => $reference,
+                'deposit_reference' => $reference,
+                'note' => 'Manual deposit review',
+                'meta' => ['manual' => true, 'name' => $name, 'phone' => $phone, 'sms' => $sms],
+            ]);
+        } catch (QueryException) {
+            // Unique (provider, deposit_reference) backstop against a race.
+            throw ValidationException::withMessages(['reference' => 'This reference has already been used or is awaiting review.']);
+        }
+
+        foreach ((array) config('lottery.admin_telegram_ids', []) as $adminId) {
+            $this->notifier->send((int) $adminId, "📥 Manual deposit to review (#{$tx->id}) from {$player->name} — {$name}, {$phone}.", 'deposit_admin');
+        }
+
+        return $tx;
+    }
+
+    /** Admin confirmed the money arrived: credit the wallet with the real amount. */
+    public function approveManual(Transaction $tx, float $amount): void
+    {
+        $amount = round($amount, 2);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages(['amount' => 'Enter the amount to credit.']);
+        }
+
+        // Lock + re-check so two admins clicking at once can't credit twice.
+        $claimed = DB::transaction(function () use ($tx, $amount): bool {
+            $locked = Transaction::whereKey($tx->getKey())->lockForUpdate()->first();
+            if (! $locked || $locked->type !== TransactionType::Deposit || $locked->status !== TransactionStatus::Pending) {
+                return false;
+            }
+
+            $player = Player::whereKey($locked->telegram_id)->lockForUpdate()->firstOrFail();
+            $player->balance = Money::toAmount(Money::toCents($player->balance) + Money::toCents($amount));
+            $player->save();
+
+            $locked->update([
+                'status' => TransactionStatus::Completed,
+                'amount' => $amount,
+                'balance_after' => $player->balance,
+                'processed_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if (! $claimed) {
+            return;
+        }
+
+        $this->notifier->send(
+            (int) $tx->telegram_id,
+            "✅ <b>Deposit approved!</b>\n+{$amount} ".config('lottery.currency').' has been added to your balance.',
+            'deposit',
+        );
+    }
+
+    /** Admin rejected the claim; the reference is freed so the player can retry. */
+    public function rejectManual(Transaction $tx, ?string $reason = null): void
+    {
+        $claimed = DB::transaction(function () use ($tx, $reason): bool {
+            $locked = Transaction::whereKey($tx->getKey())->lockForUpdate()->first();
+            if (! $locked || $locked->type !== TransactionType::Deposit || $locked->status !== TransactionStatus::Pending) {
+                return false;
+            }
+
+            $locked->update([
+                'status' => TransactionStatus::Rejected,
+                'deposit_reference' => null, // free the reference for a retry
+                'processed_at' => now(),
+                'note' => 'Manual deposit review'.($reason ? ' — '.$reason : ''),
+            ]);
+
+            return true;
+        });
+
+        if (! $claimed) {
+            return;
+        }
+
+        $this->notifier->send(
+            (int) $tx->telegram_id,
+            "❌ <b>Deposit declined</b>\nWe could not confirm your payment.".($reason ? "\nReason: ".$reason : '').' Contact support if you believe this is a mistake.',
+            'deposit',
+        );
     }
 
     /** Ensure the verified payment actually landed in one of our accounts. */

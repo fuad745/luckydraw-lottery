@@ -9,6 +9,13 @@
         <h2 class="text-lg font-bold text-slate-100">💳 Payments</h2>
 
         <div>
+            <label class="label" for="s-verifykey">Verify API key</label>
+            <input id="s-verifykey" type="text" wire:model="verifyKey" class="input font-mono text-sm" placeholder="Paste your verifyapi.leulzenebe.pro API key" autocomplete="off">
+            <p class="mt-1 text-xs text-slate-500">Get a free key at <a href="https://verify.leul.et" target="_blank" rel="noopener" class="text-gold-300 underline">verify.leul.et</a>. Without it, automatic verification is off and every deposit goes to manual review.</p>
+            @error('verifyKey') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+        </div>
+
+        <div>
             <label class="label">Payment methods</label>
             <p class="mb-2 text-xs text-slate-500">Enable the methods players can deposit/withdraw with.</p>
             <div class="grid grid-cols-2 gap-2">

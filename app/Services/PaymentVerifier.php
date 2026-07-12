@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Client for the verify.leul.et payment-verification API
@@ -46,6 +47,8 @@ final class PaymentVerifier
             $res = Http::withHeaders(['x-api-key' => (string) config('lottery.payments.verify_key')])
                 ->asJson()->timeout(25)->post($url, $body);
         } catch (\Throwable $e) {
+            Log::error('Payment verify: request failed', ['url' => $url, 'error' => $e->getMessage()]);
+
             return $fail('Could not reach the verification service. Try again shortly.');
         }
 
@@ -77,6 +80,8 @@ final class PaymentVerifier
         $success = $res->successful() && $flagOk && $stateOk && $positive && $this->extractAmount($data) > 0;
 
         if (! $success) {
+            Log::warning('Payment verify: rejected', ['reference' => $reference, 'status' => $res->status(), 'body' => $data]);
+
             return $fail($data['message'] ?? $data['error'] ?? 'We could not verify that reference. Double-check it.');
         }
 
