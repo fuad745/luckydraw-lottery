@@ -111,8 +111,13 @@ final class Wallet extends Component
         $auth = $this->auth();
         $player = $auth->player();
 
+        // Rejected rows are hidden from the activity feed; a declined
+        // withdrawal still shows in the status timeline below, and the player
+        // is notified of a declined deposit by the bot.
         $transactions = $player
-            ? Transaction::where('telegram_id', $auth->id())->latest('id')->limit(30)->get()
+            ? Transaction::where('telegram_id', $auth->id())
+                ->where('status', '!=', TransactionStatus::Rejected->value)
+                ->latest('id')->limit(30)->get()
             : collect();
 
         $withdrawals = $player

@@ -26,7 +26,9 @@ final class Dashboard extends Component
             'liabilities' => (float) Player::sum('balance'),
             'house' => (float) Round::sum('admin_cut'),
             'paid_out' => (float) Transaction::where('type', TransactionType::Winning->value)->sum('amount'),
-            'deposits' => (float) Transaction::where('type', TransactionType::Deposit->value)->sum('amount'),
+            // Completed only — pending/rejected manual claims are unverified
+            // player-typed amounts, not money that arrived.
+            'deposits' => (float) Transaction::where('type', TransactionType::Deposit->value)->where('status', TransactionStatus::Completed->value)->sum('amount'),
             'withdrawn' => (float) Transaction::where('type', TransactionType::Withdrawal->value)->where('status', TransactionStatus::Completed->value)->sum('amount'),
             'rounds' => Round::where('status', RoundStatus::Closed->value)->count(),
             'pending_withdrawals' => Transaction::where('type', TransactionType::Withdrawal->value)->where('status', TransactionStatus::Pending->value)->count(),
@@ -38,7 +40,8 @@ final class Dashboard extends Component
             'kpis' => $kpis,
             'current' => Round::current(),
             'chart' => $this->dailySeries(14),
-            'recent' => Transaction::with('player')->latest('id')->limit(8)->get(),
+            // Rejected rows stay on the Transactions ledger, not the pulse feed.
+            'recent' => Transaction::with('player')->where('status', '!=', TransactionStatus::Rejected->value)->latest('id')->limit(8)->get(),
         ]);
     }
 
