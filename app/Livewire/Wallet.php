@@ -81,7 +81,7 @@ final class Wallet extends Component
         }
 
         $this->dispatch('haptic', type: 'notification', style: 'warning');
-        $this->dispatch('toast', message: __('We could not verify it automatically — your deposit is with the admin for approval. Your balance will update once approved.'), type: 'info');
+        $this->dispatch('toast', message: __('Your deposit is being reviewed — please wait until it is approved.'), type: 'info');
     }
 
     public function withdraw(WithdrawalService $withdrawals): void

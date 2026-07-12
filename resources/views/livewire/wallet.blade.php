@@ -42,7 +42,7 @@
         {{-- Deposit --}}
         <section x-show="tab==='deposit'" x-cloak x-transition class="card mt-3 p-4">
             @if ($pendingDeposit)
-                <p class="mb-3 rounded-lg bg-amber-500/15 p-2 text-xs text-amber-300">⏳ {{ __('Your deposit is awaiting admin approval — your balance will update once it is approved.') }}</p>
+                <p class="mb-3 rounded-lg bg-amber-500/15 p-2 text-xs text-amber-300">⏳ {{ __('Your deposit is being reviewed — your balance will update once approved.') }}</p>
             @endif
 
             {{-- Where to send the money — individually configured accounts, copyable --}}
